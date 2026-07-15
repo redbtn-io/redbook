@@ -1,5 +1,28 @@
 import React, { useState } from 'react';
 import './App.css';
+import { buildSubmissionPayload, isValidEmail } from './form';
+
+const submitEndpoint = import.meta.env.VITE_CRM_SEND_URL || '/send';
+
+const fileToBase64 = async (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error('Unable to read image file.'));
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Unable to read image file.'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
 
 function App() {
   const [formData, setFormData] = useState({
@@ -8,6 +31,7 @@ function App() {
     source: '',
     img: null as File | null,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -29,26 +53,33 @@ function App() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate email with regex
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
+    if (!formData.img) {
+      alert('Please upload an image.');
+      return;
+    }
+
+    if (!isValidEmail(formData.email)) {
       alert('Please enter a valid email address.');
       return;
     }
 
-    // Prepare form data for submission
-    const data = new FormData();
-    data.append('name', formData.name);
-    data.append('email', formData.email);
-    data.append('source', formData.source);
-    if (formData.img) {
-      data.append('img', formData.img);
-    }
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch('https://organic-umbrella-gx6j9j56w53vq7v-3000.app.github.dev/send', {
+      const imageData = await fileToBase64(formData.img);
+      const payload = buildSubmissionPayload({
+        name: formData.name,
+        email: formData.email,
+        source: formData.source,
+        img: imageData,
+      });
+
+      const response = await fetch(submitEndpoint, {
         method: 'POST',
-        body: data,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -60,6 +91,8 @@ function App() {
     } catch (error) {
       console.error('Error submitting form:', error);
       alert('An error occurred while submitting the form.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -110,7 +143,9 @@ function App() {
             required
           />
         </div>
-        <button type="submit">Submit</button>
+        <button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? 'Submitting...' : 'Submit'}
+        </button>
       </form>
     </div>
   );
