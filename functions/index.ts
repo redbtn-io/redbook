@@ -2,6 +2,7 @@ import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { parse } from 'url';
 import { StringDecoder } from 'string_decoder';
 import * as nodemailer from 'nodemailer';
+import { buildEmailHtml, validateSendPayload } from './email';
 
 const port = 3000;
 
@@ -18,7 +19,7 @@ const sendEmail = async (to: string, name: string, source: string, img: string):
         from: process.env.EMAIL_USER,
         to,
         subject: "Your secret code",
-        html: `<p>Hi ${name} it's George with NILICO. Blah blah blah your union ${source} is offering you a benefit.</p> \n <img src=${img} />`,
+        html: buildEmailHtml({ name, source, img }),
     };
 
     return await new Promise<void>((resolve, reject) => {
@@ -50,14 +51,16 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
         if (parsedUrl.pathname === '/send' && method.toUpperCase() === 'POST') {
             try {
                 const parsedBody = JSON.parse(body);
-                const { email, name, source, img } = parsedBody;
 
-                // Validate required fields
-                if (!email || !name || !source || !img) {
+                // Validate + sanitize untrusted input at the trust boundary.
+                const validation = validateSendPayload(parsedBody);
+                if (!validation.ok) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ error: 'Missing required fields: email, name, source, or img' }));
+                    res.end(JSON.stringify({ error: validation.error }));
                     return;
                 }
+
+                const { email, name, source, img } = validation.value;
 
                 // Send the email
                 await sendEmail(email, name, source, img);
