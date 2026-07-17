@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { AddressInfo } from 'net';
 
-import { parseRequestBody } from '../index';
+import { parseRequestBody, server } from '../index';
 
 describe('parseRequestBody', () => {
   it('parses valid JSON payloads', () => {
@@ -22,5 +23,34 @@ describe('parseRequestBody', () => {
       ok: false,
       error: 'Invalid JSON payload',
     });
+  });
+});
+
+describe('POST /send (HTTP boundary)', () => {
+  let baseUrl: string;
+
+  beforeAll(async () => {
+    await new Promise<void>((resolve) => {
+      server.listen(0, () => resolve());
+    });
+    const { port } = server.address() as AddressInfo;
+    baseUrl = `http://127.0.0.1:${port}`;
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+  });
+
+  it('returns HTTP 400 with the expected error shape for a malformed JSON body', async () => {
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{bad-json}',
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'Invalid JSON payload' });
   });
 });

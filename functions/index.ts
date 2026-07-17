@@ -47,7 +47,7 @@ export const parseRequestBody = (body: string): ParsedBody => {
     }
 };
 
-const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+export const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const parsedUrl = parse(req.url || '', true);
     const method = req.method || '';
     const decoder = new StringDecoder('utf-8');
@@ -63,7 +63,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
         if (parsedUrl.pathname === '/send' && method.toUpperCase() === 'POST') {
             try {
                 const parsedBodyResult = parseRequestBody(body);
-                if (!parsedBodyResult.ok) {
+                if (parsedBodyResult.ok === false) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: parsedBodyResult.error }));
                     return;
@@ -71,7 +71,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 
                 // Validate + sanitize untrusted input at the trust boundary.
                 const validation = validateSendPayload(parsedBodyResult.value);
-                if (!validation.ok) {
+                if (validation.ok === false) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: validation.error }));
                     return;
