@@ -35,6 +35,18 @@ const sendEmail = async (to: string, name: string, source: string, img: string):
     });
 };
 
+export type ParsedBody =
+    | { ok: true; value: unknown }
+    | { ok: false; error: string };
+
+export const parseRequestBody = (body: string): ParsedBody => {
+    try {
+        return { ok: true, value: JSON.parse(body) };
+    } catch {
+        return { ok: false, error: 'Invalid JSON payload' };
+    }
+};
+
 const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const parsedUrl = parse(req.url || '', true);
     const method = req.method || '';
@@ -50,10 +62,15 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 
         if (parsedUrl.pathname === '/send' && method.toUpperCase() === 'POST') {
             try {
-                const parsedBody = JSON.parse(body);
+                const parsedBodyResult = parseRequestBody(body);
+                if (!parsedBodyResult.ok) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: parsedBodyResult.error }));
+                    return;
+                }
 
                 // Validate + sanitize untrusted input at the trust boundary.
-                const validation = validateSendPayload(parsedBody);
+                const validation = validateSendPayload(parsedBodyResult.value);
                 if (!validation.ok) {
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: validation.error }));
@@ -80,6 +97,8 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     });
 });
 
-server.listen(port, () => {
-    console.log(`Server is running on http://localhost:${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    server.listen(port, () => {
+        console.log(`Server is running on http://localhost:${port}`);
+    });
+}
