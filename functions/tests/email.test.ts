@@ -95,6 +95,14 @@ describe('validateSendPayload', () => {
     }
   });
 
+  it('treats whitespace-only image data as missing required fields', () => {
+    const result = validateSendPayload({ ...base, img: ' \n\t ' });
+    expect(result).toEqual({
+      ok: false,
+      error: 'Missing required fields: email, name, source, or img',
+    });
+  });
+
   it('rejects an invalid recipient address', () => {
     const result = validateSendPayload({ ...base, email: 'a@b.com, victim@evil.com' });
     expect(result).toEqual({ ok: false, error: 'Invalid email address' });
