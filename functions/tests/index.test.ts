@@ -70,4 +70,76 @@ describe('POST /send (HTTP boundary)', () => {
     expect(res.status).toBe(413);
     await expect(res.json()).resolves.toEqual({ error: 'Payload too large' });
   });
+
+  it('rejects duplicated recipient email values after normalization', async () => {
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: ' lead@example.com ,  lead@example.com ',
+        name: 'Jane',
+        source: 'Landing',
+        img: 'data:image/png;base64,abcd',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Invalid email address',
+    });
+  });
+
+  it('rejects whitespace-only required fields after normalization', async () => {
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'lead@example.com',
+        name: '   ',
+        source: '\n\t   ',
+        img: 'data:image/png;base64,abcd',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Missing required fields: email, name, source, or img',
+    });
+  });
+
+  it('treats whitespace-only image data as a missing required field', async () => {
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'lead@example.com',
+        name: 'Jane',
+        source: 'Landing',
+        img: ' \n\t ',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Missing required fields: email, name, source, or img',
+    });
+  });
+
+  it('returns missing-required-fields for whitespace-only contact fields', async () => {
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: '  ',
+        name: '   ',
+        source: '   ',
+        img: '   ',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Missing required fields: email, name, source, or img',
+    });
+  });
 });
