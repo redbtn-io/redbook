@@ -53,4 +53,22 @@ describe('POST /send (HTTP boundary)', () => {
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'Invalid JSON payload' });
   });
+
+  it('rejects duplicated recipient email values after normalization', async () => {
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: ' lead@example.com ,  lead@example.com ',
+        name: 'Jane',
+        source: 'Landing',
+        img: 'data:image/png;base64,abcd',
+      }),
+    });
+
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({
+      error: 'Invalid email address',
+    });
+  });
 });
