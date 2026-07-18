@@ -83,6 +83,9 @@ export const validateSendPayload = (body: unknown): ValidationResult => {
   }
 
   const { email, name, source, img } = body as Record<string, unknown>;
+  const normalizedEmail = typeof email === 'string' ? email.trim() : '';
+  const normalizedName = typeof name === 'string' ? name.trim() : '';
+  const normalizedSource = typeof source === 'string' ? source.trim() : '';
 
   if (!email || !name || !source || !img) {
     return {
@@ -95,7 +98,14 @@ export const validateSendPayload = (body: unknown): ValidationResult => {
     return { ok: false, error: 'Invalid field types: name and source must be strings' };
   }
 
-  if (!isValidEmailAddress(email)) {
+  if (!normalizedName || !normalizedSource) {
+    return {
+      ok: false,
+      error: 'Missing required fields: email, name, source, or img',
+    };
+  }
+
+  if (!isValidEmailAddress(normalizedEmail)) {
     return { ok: false, error: 'Invalid email address' };
   }
 
@@ -109,6 +119,11 @@ export const validateSendPayload = (body: unknown): ValidationResult => {
 
   return {
     ok: true,
-    value: { email: email.trim(), name, source, img: safeImg },
+    value: {
+      email: normalizedEmail,
+      name: normalizedName,
+      source: normalizedSource,
+      img: safeImg,
+    },
   };
 };
