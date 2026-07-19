@@ -6,6 +6,14 @@ import { buildEmailHtml, validateSendPayload } from './email';
 
 const port = 3000;
 
+// /send is public and unauthenticated. Without a cap, the handler below
+// buffers the entire request body into a JS string before any validation
+// runs, so an attacker (or a buggy client) can send an arbitrarily large
+// body and exhaust server memory. 10MB comfortably covers a single
+// base64-encoded photo upload (the only large field this endpoint accepts)
+// while bounding the worst case per request.
+export const MAX_BODY_BYTES = 10 * 1024 * 1024;
+
 const sendEmail = async (to: string, name: string, source: string, img: string): Promise<void> => {
     const transporter = nodemailer.createTransport({
         service: "gmail",
@@ -52,12 +60,27 @@ export const server = createServer((req: IncomingMessage, res: ServerResponse) =
     const method = req.method || '';
     const decoder = new StringDecoder('utf-8');
     let body = '';
+    let bodyBytes = 0;
+    let rejected = false;
 
     req.on('data', (chunk) => {
+        if (rejected) return;
+
+        bodyBytes += chunk.length;
+        if (bodyBytes > MAX_BODY_BYTES) {
+            rejected = true;
+            res.writeHead(413, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Payload too large' }), () => {
+                req.destroy();
+            });
+            return;
+        }
+
         body += decoder.write(chunk);
     });
 
     req.on('end', async () => {
+        if (rejected) return;
         decoder.end();
 
         if (parsedUrl.pathname === '/send' && method.toUpperCase() === 'POST') {
