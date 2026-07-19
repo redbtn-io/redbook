@@ -97,10 +97,12 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label htmlFor="name">Name:</label>
+    <main className="App">
+      <form className="book-form" onSubmit={handleSubmit} aria-labelledby="book-form-title">
+        <h1 className="book-form__title" id="book-form-title">Send us your details</h1>
+        <p className="book-form__description">Complete the form and include an image to get started.</p>
+        <div className="book-form__field">
+          <label htmlFor="name">Name</label>
           <input
             type="text"
             id="name"
@@ -110,8 +112,8 @@ function App() {
             required
           />
         </div>
-        <div>
-          <label htmlFor="email">Email:</label>
+        <div className="book-form__field">
+          <label htmlFor="email">Email</label>
           <input
             type="email"
             id="email"
@@ -121,8 +123,8 @@ function App() {
             required
           />
         </div>
-        <div>
-          <label htmlFor="source">Source:</label>
+        <div className="book-form__field">
+          <label htmlFor="source">Source</label>
           <input
             type="text"
             id="source"
@@ -132,8 +134,8 @@ function App() {
             required
           />
         </div>
-        <div>
-          <label htmlFor="img">Image:</label>
+        <div className="book-form__field">
+          <label htmlFor="img">Image</label>
           <input
             type="file"
             id="img"
@@ -147,7 +149,7 @@ function App() {
           {isSubmitting ? 'Submitting...' : 'Submit'}
         </button>
       </form>
-    </div>
+    </main>
   );
 }
 
