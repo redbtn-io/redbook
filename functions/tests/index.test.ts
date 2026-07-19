@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'net';
 
-import { parseRequestBody, server } from '../index';
+import { MAX_BODY_BYTES, parseRequestBody, server } from '../index';
 
 describe('parseRequestBody', () => {
   it('parses valid JSON payloads', () => {
@@ -52,5 +52,22 @@ describe('POST /send (HTTP boundary)', () => {
 
     expect(res.status).toBe(400);
     await expect(res.json()).resolves.toEqual({ error: 'Invalid JSON payload' });
+  });
+
+  it('rejects a request body larger than MAX_BODY_BYTES with 413 instead of buffering it', async () => {
+    const oversizedImg = 'a'.repeat(MAX_BODY_BYTES + 1);
+    const res = await fetch(`${baseUrl}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'lead@example.com',
+        name: 'Jane',
+        source: 'Landing',
+        img: oversizedImg,
+      }),
+    });
+
+    expect(res.status).toBe(413);
+    await expect(res.json()).resolves.toEqual({ error: 'Payload too large' });
   });
 });
