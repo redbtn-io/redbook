@@ -1,42 +1,96 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  min-height: 100vh;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+.App {
+  box-sizing: border-box;
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 1.5rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.book-form {
+  box-sizing: border-box;
+  width: min(100%, 30rem);
+  padding: 1.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  box-shadow: var(--shadow-lg);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.book-form__title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  line-height: 1.25;
 }
 
-.card {
-  padding: 2em;
+.book-form__description {
+  margin: 0.5rem 0 1.5rem;
+  color: var(--text-secondary);
 }
 
-.read-the-docs {
-  color: #888;
+.book-form__field {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.book-form label {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.book-form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.625rem 0.75rem;
+  color: var(--text-primary);
+  font: inherit;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+}
+
+.book-form input:hover {
+  border-color: var(--border-hover);
+}
+
+.book-form input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.book-form button {
+  width: 100%;
+  min-height: 2.75rem;
+  margin-top: 1.5rem;
+  padding: 0.625rem 1rem;
+  color: var(--accent-foreground);
+  font: inherit;
+  font-weight: 700;
+  background: var(--accent);
+  border: 0;
+  border-radius: 0.5rem;
+  transition: background-color 150ms ease, opacity 150ms ease;
+}
+
+.book-form button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.book-form button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-muted);
+}
+
+.book-form button:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
