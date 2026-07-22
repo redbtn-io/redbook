@@ -27,6 +27,23 @@ function isRegistryResolution(resolved, packageName, version) {
   }
 }
 
+function validateLockfileDependencyClosure(lockfile, packagePath, lockedPackage, errors) {
+  const dependencies = lockedPackage?.dependencies;
+  if (!dependencies || typeof dependencies !== 'object') {
+    return;
+  }
+
+  for (const dependencyName of Object.keys(dependencies)) {
+    const nodeModulesDependency = `node_modules/${dependencyName}`;
+
+    if (!lockfile.packages || !Object.prototype.hasOwnProperty.call(lockfile.packages, nodeModulesDependency)) {
+      errors.push(
+        `${packagePath} declares dependency ${dependencyName} but package-lock.json is missing ${nodeModulesDependency}.`,
+      );
+    }
+  }
+}
+
 async function readJson(file) {
   return JSON.parse(await readFile(file, 'utf8'));
 }
@@ -107,6 +124,8 @@ export async function verifySharedDependencies({ directory }) {
       if (typeof lockedPackage.integrity !== 'string' || !sha512Integrity.test(lockedPackage.integrity)) {
         errors.push(`${packagePath} must use a sha512 integrity value from registry publication.`);
       }
+
+      validateLockfileDependencyClosure(lockfile, packagePath, lockedPackage, errors);
     }
   }
 
