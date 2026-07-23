@@ -14,8 +14,35 @@ jobs:
         working-directory: functions
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
+
+      - name: Authenticate to @redbtn registry
+        env:
+          REDBTN_NPM_USER: ${{ secrets.REDBTN_NPM_USER }}
+          REDBTN_NPM_PASSWORD: ${{ secrets.REDBTN_NPM_PASSWORD }}
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/redbtn-npmrc
+        run: |
+          set -eu
+          test -n "$REDBTN_NPM_USER" || { echo 'REDBTN_NPM_USER Actions secret is required.' >&2; exit 1; }
+          test -n "$REDBTN_NPM_PASSWORD" || { echo 'REDBTN_NPM_PASSWORD Actions secret is required.' >&2; exit 1; }
+          umask 077
+          {
+            printf '@redbtn:registry=https://registry.redbtn.io/\n'
+            printf '//registry.redbtn.io/:username=%s\n' "$REDBTN_NPM_USER"
+            printf '//registry.redbtn.io/:_password=%s\n' "$(printf '%s' "$REDBTN_NPM_PASSWORD" | base64 -w0)"
+            printf '//registry.redbtn.io/:always-auth=true\n'
+          } > "$NPM_CONFIG_USERCONFIG"
+          echo "NPM_CONFIG_USERCONFIG=$NPM_CONFIG_USERCONFIG" >> "$GITHUB_ENV"
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Revoke registry credentials
+        if: always()
+        run: rm -f "${NPM_CONFIG_USERCONFIG:-$RUNNER_TEMP/redbtn-npmrc}"
+
       - run: npm run verify:shared-dependencies
