@@ -30,7 +30,7 @@ jobs:
           umask 077
           {
             printf '@redbtn:registry=https://registry.redbtn.io/\n'
-            printf '//registry.redbtn.io/:_auth=%s\n' "$REDBTN_NPM_TOKEN"
+            printf '//registry.redbtn.io/:_authToken=%s\n' "$REDBTN_NPM_TOKEN"
             printf 'always-auth=true\n'
           } > "$NPM_CONFIG_USERCONFIG"
           NPM_CONFIG_USERCONFIG="$NPM_CONFIG_USERCONFIG" npm whoami --registry https://registry.redbtn.io/
