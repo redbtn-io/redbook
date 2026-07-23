@@ -1,0 +1,27 @@
+{
+  "name": "redbook",
+  "channel": "beta",
+  "git": {
+    "repository": "redbtn-io/redbook",
+    "branch": "beta",
+    "autoDeploy": true
+  },
+  "appConfig": {
+    "port": 3000,
+    "customDomains": ["redbook.redbtn.io"]
+  },
+  "runtime": {
+    "healthPath": "/healthz",
+    "readinessPath": "/ready",
+    "environment": [
+      "REDRUN_CHANNEL",
+      "PUBLIC_URL",
+      "MONGODB_URI",
+      "MONGODB_DB",
+      "AUTH_MONGODB_URI",
+      "AUTH_MONGODB_DB",
+      "REDBOOK_SECRETS_ENCRYPTION_KEY",
+      "REDSECRETS_DATABASE"
+    ]
+  }
+}
