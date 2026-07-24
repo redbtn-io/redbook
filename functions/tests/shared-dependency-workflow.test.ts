@@ -8,11 +8,11 @@ const workflow = readFileSync(
 );
 
 describe("shared dependency workflow registry authentication", () => {
-  it("uses the token auth field for the registry token secret", () => {
-    expect(workflow).toContain(
-      "printf '//registry.redbtn.io/:_authToken=%s\\n' \"$REDBTN_NPM_TOKEN\"",
-    );
-    expect(workflow).not.toContain("//registry.redbtn.io/:_auth=");
+  it("loads the registry credential from the NPMRC Actions secret", () => {
+    expect(workflow).toContain("NPMRC: ${{ secrets.NPMRC }}");
+    expect(workflow).toContain('printf \'%s\\n\' "$NPMRC" > "$NPM_CONFIG_USERCONFIG"');
+    expect(workflow).toContain("npm whoami --registry https://registry.redbtn.io/");
+    expect(workflow).not.toContain("REDBTN_NPM_TOKEN");
   });
 
   it("keeps credentials in the temporary npm user config", () => {
