@@ -3,7 +3,7 @@ name: Shared dependency contract
 on:
   pull_request:
   push:
-    branches: [beta]
+    branches: [beta, main]
 
 jobs:
   shared-dependency-contract:
@@ -14,7 +14,37 @@ jobs:
         working-directory: functions
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Authenticate to @redbtn registry
+        env:
+          NPMRC: ${{ secrets.NPMRC }}
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/redbtn-npmrc
+        run: |
+          set -eu
+          test -n "$NPMRC" || { echo 'NPMRC Actions secret is required.' >&2; exit 1; }
+          umask 077
+          printf '%s\n' "$NPMRC" > "$NPM_CONFIG_USERCONFIG"
+          grep -Eq '^@redbtn:registry=https://registry\.redbtn\.io/?$' "$NPM_CONFIG_USERCONFIG" || {
+            echo 'NPMRC must map @redbtn to registry.redbtn.io.' >&2
+            exit 1
+          }
+          grep -Eq '^//registry\.redbtn\.io/:(_authToken|username|_password)=' "$NPM_CONFIG_USERCONFIG" || {
+            echo 'NPMRC must contain registry.redbtn.io authentication.' >&2
+            exit 1
+          }
+          NPM_CONFIG_USERCONFIG="$NPM_CONFIG_USERCONFIG" npm whoami --registry https://registry.redbtn.io/
+          echo "NPM_CONFIG_USERCONFIG=$NPM_CONFIG_USERCONFIG" >> "$GITHUB_ENV"
+
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+
+      - name: Revoke registry credentials
+        if: always()
+        run: rm -f "${NPM_CONFIG_USERCONFIG:-$RUNNER_TEMP/redbtn-npmrc}"
+
       - run: npm run verify:shared-dependencies
