@@ -8,7 +8,7 @@ on:
 jobs:
   shared-dependency-contract:
     name: Verify shared dependency contract
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     defaults:
       run:
         working-directory: functions
