@@ -1,4 +1,4 @@
-import { errorResponse, json, readJsonBody, withPrincipal } from "@/lib/api";
+import { errorResponse, json, readJsonBody, withOrg } from "@/lib/api";
 import { validateNote } from "@/lib/crm";
 import { deleteNote, updateNote } from "@/lib/repository";
 
@@ -8,12 +8,12 @@ type Params = { params: Promise<{ noteId: string }> };
 
 export async function PATCH(request: Request, { params }: Params): Promise<Response> {
   const { noteId } = await params;
-  return withPrincipal(request, async (principal) => {
+  return withOrg(request, async ({ membership, principal }) => {
     const body = await readJsonBody(request);
     if (!body.ok) return errorResponse(400, body.error);
     const validated = validateNote(body.value, { partial: true });
     if (!validated.ok) return errorResponse(400, validated.error);
-    const note = await updateNote(principal, noteId, validated.value);
+    const note = await updateNote(membership, noteId, validated.value);
     if (!note) return errorResponse(404, "Not Found");
     return json({ note });
   });
@@ -21,8 +21,8 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
 
 export async function DELETE(request: Request, { params }: Params): Promise<Response> {
   const { noteId } = await params;
-  return withPrincipal(request, async (principal) => {
-    const removed = await deleteNote(principal, noteId);
+  return withOrg(request, async ({ membership, principal }) => {
+    const removed = await deleteNote(membership, noteId);
     if (!removed) return errorResponse(404, "Not Found");
     return json({ deleted: true });
   });

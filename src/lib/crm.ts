@@ -16,11 +16,12 @@ export type ClientStatus = (typeof CLIENT_STATUSES)[number];
 export const INTERACTION_TYPES = ["call", "meeting", "email", "conversation", "other"] as const;
 export type InteractionType = (typeof INTERACTION_TYPES)[number];
 
-/** Fields every record carries: ownership, authorship, timestamps. */
+/** Fields every record carries: tenant, authorship, timestamps. */
 export interface BaseRecord {
   id: string;
-  /** The verified principal this record belongs to. Every query filters on it. */
-  ownerId: string;
+  /** The org that owns this record. Every query filters on it. */
+  orgId: string;
+  /** Who typed it in. Attribution and audit only — not a permission check. */
   createdBy: string;
   createdAt: string;
   updatedAt: string;

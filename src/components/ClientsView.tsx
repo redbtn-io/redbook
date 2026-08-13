@@ -23,7 +23,13 @@ const EMPTY_FORM = {
   summary: "",
 };
 
-export function ClientsView({ initialClients }: { initialClients: ClientWithStats[] }) {
+export function ClientsView({
+  initialClients,
+  orgName,
+}: {
+  initialClients: ClientWithStats[];
+  orgName?: string;
+}) {
   const router = useRouter();
   const [clients, setClients] = useState(initialClients);
   const [query, setQuery] = useState("");
@@ -97,6 +103,7 @@ export function ClientsView({ initialClients }: { initialClients: ClientWithStat
         <div>
           <h1 className="text-2xl font-semibold text-text-primary">Clients</h1>
           <p className="mt-1 text-sm text-text-secondary">
+            {orgName ? `${orgName} · ` : ""}
             {clients.length} {clients.length === 1 ? "account" : "accounts"} · {formatCurrency(totalArr)} tracked
           </p>
         </div>

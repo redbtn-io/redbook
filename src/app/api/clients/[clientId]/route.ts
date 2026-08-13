@@ -1,4 +1,4 @@
-import { errorResponse, json, readJsonBody, withPrincipal } from "@/lib/api";
+import { errorResponse, json, readJsonBody, withOrg } from "@/lib/api";
 import { validateClient } from "@/lib/crm";
 import {
   deleteClient,
@@ -21,13 +21,13 @@ type Params = { params: Promise<{ clientId: string }> };
  */
 export async function GET(request: Request, { params }: Params): Promise<Response> {
   const { clientId } = await params;
-  return withPrincipal(request, async (principal) => {
-    const client = await getClient(principal, clientId);
+  return withOrg(request, async ({ membership, principal }) => {
+    const client = await getClient(membership, clientId);
     if (!client) return errorResponse(404, "Not Found");
     const [contacts, notes, interactions] = await Promise.all([
-      listContacts(principal, clientId),
-      listNotes(principal, clientId),
-      listInteractions(principal, clientId),
+      listContacts(membership, clientId),
+      listNotes(membership, clientId),
+      listInteractions(membership, clientId),
     ]);
     return json({ client, contacts, notes, interactions });
   });
@@ -35,12 +35,12 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
 
 export async function PATCH(request: Request, { params }: Params): Promise<Response> {
   const { clientId } = await params;
-  return withPrincipal(request, async (principal) => {
+  return withOrg(request, async ({ membership, principal }) => {
     const body = await readJsonBody(request);
     if (!body.ok) return errorResponse(400, body.error);
     const validated = validateClient(body.value, { partial: true });
     if (!validated.ok) return errorResponse(400, validated.error);
-    const client = await updateClient(principal, clientId, validated.value);
+    const client = await updateClient(membership, clientId, validated.value);
     if (!client) return errorResponse(404, "Not Found");
     return json({ client });
   });
@@ -48,8 +48,8 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
 
 export async function DELETE(request: Request, { params }: Params): Promise<Response> {
   const { clientId } = await params;
-  return withPrincipal(request, async (principal) => {
-    const removed = await deleteClient(principal, clientId);
+  return withOrg(request, async ({ membership, principal }) => {
+    const removed = await deleteClient(membership, clientId);
     if (!removed) return errorResponse(404, "Not Found");
     return json({ deleted: true });
   });
