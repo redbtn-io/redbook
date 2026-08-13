@@ -20,13 +20,26 @@
     workspace `appConfig.env`, because RedRun's redsecrets integration is
     build-time only and this is a runtime credential.
 
+- `@redbtn/redorg@^0.2.1`
+  - Organizations and membership. An org is a redBook TENANT: one org is one
+    shared book of business, and org membership is the access boundary for
+    every CRM record. Consumed as a LIBRARY (it is a mongoose package, not a
+    service) against redBook's own `redbook` database with the default `org_`
+    collection prefix, so its slugs are redBook-local and cannot collide with
+    another app's in the fleet directory.
+  - Used for: `getUserOrgs` (membership resolution on every request),
+    `getOrgBySlug`, `createOrg`, `getMember`, `getRoles`, `addMember`.
+
 ## Evaluated but intentionally not adopted
 
-- `@redbtn/redorg`
-  - redBook's ownership model is per user, not per organization. Adding an
-    org/tenant layer would introduce a sharing model nobody has specified and
-    a second source of authority beside the session. Revisit if and when the
-    book needs to be shared between people.
+- `@redbtn/redauth` `findOrCreateUser` against the shared directory
+  - Seeding "these humans are members" needs email to userId resolution, and
+    redOrg keys membership by userId. redBook resolves that READ-ONLY against
+    the shared `redauth` users collection (`src/lib/directory.ts`). It does
+    not create ecosystem identities: minting a real, fleet-wide user record as
+    a side effect of seeding placeholder data is not redBook's call. An email
+    with no identity yet becomes a pending member instead, claimed the first
+    time that person signs in through accounts.redbtn.io.
 
 ## Contract
 

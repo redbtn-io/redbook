@@ -1,23 +1,34 @@
 import { Shell } from "@/components/Shell";
 import { ClientsView, type ClientWithStats } from "@/components/ClientsView";
 import { requirePrincipal } from "@/lib/server-session";
+import { resolveActiveOrg } from "@/lib/redorg";
 import { ensureSeeded } from "@/lib/seed";
 import { listClients, summarizeClients } from "@/lib/repository";
 
 /**
- * The book. Gated server-side: an unauthenticated visitor is redirected to
- * accounts.redbtn.io before any data is fetched, so nothing renders and no
+ * The org's book. Gated server-side: an unauthenticated visitor is redirected
+ * to accounts.redbtn.io before any data is fetched, so nothing renders and no
  * query runs for a caller without a verified session.
  */
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const principal = await requirePrincipal("/");
-  await ensureSeeded(principal);
+  const resolved = await resolveActiveOrg(principal);
+  if (!resolved) {
+    return (
+      <Shell email={principal.email}>
+        <p className="text-text-secondary">You are not a member of any book yet.</p>
+      </Shell>
+    );
+  }
+
+  const { membership, memberships } = resolved;
+  await ensureSeeded(membership, principal);
 
   const [clients, summaries] = await Promise.all([
-    listClients(principal),
-    summarizeClients(principal),
+    listClients(membership),
+    summarizeClients(membership),
   ]);
 
   const withStats: ClientWithStats[] = clients.map((client) => ({
@@ -31,8 +42,8 @@ export default async function HomePage() {
   }));
 
   return (
-    <Shell email={principal.email}>
-      <ClientsView initialClients={withStats} />
+    <Shell email={principal.email} orgName={membership.orgName} orgCount={memberships.length}>
+      <ClientsView initialClients={withStats} orgName={membership.orgName} />
     </Shell>
   );
 }

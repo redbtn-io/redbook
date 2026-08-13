@@ -28,14 +28,38 @@ signs with. Three transports are accepted, each failing closed:
 
 There are no API keys and no local login page.
 
-## Ownership
+## Tenancy
 
-Every record carries the `ownerId` of the principal that created it, and every
-read and write is filtered by it. The filter is derived from the verified
-session inside `src/lib/authz.ts` and never from a request parameter, so
-another user's record is indistinguishable from one that does not exist (404,
-not 403). `src/lib/repository.ts` takes a `Principal` rather than an owner id
-specifically so a query cannot be issued without one.
+The access boundary is the **organization**. One org is one shared book of
+business: every member sees and edits the same clients, contacts, notes, and
+interactions. `createdBy` on a record is authorship for audit and attribution,
+deliberately **not** a permission check — a CRM where a colleague cannot edit a
+client you typed in is not a shared book.
+
+Orgs and membership come from `@redbtn/redorg`, consumed as a library against
+redBook's own `redbook` database (`org_` collection prefix). `getUserOrgs` is
+the only source of org authority: an `orgId` from a request is honoured solely
+after being matched against that caller's real memberships, and a mismatch is a
+403 rather than a silent fallback to their default book.
+
+Every read and write carries an org filter derived from a proven
+`OrgMembership`. `src/lib/repository.ts` takes that type rather than a bare
+string precisely so a query cannot be issued for a tenant nobody proved, and
+`requireOrgFilter` throws instead of returning `{}` — an unscoped filter would
+read every tenant at once. Another org's record is indistinguishable from one
+that does not exist (404, not 403).
+
+### Members
+
+`REDBOOK_ORG_MEMBER_EMAILS` seats people in the bootstrapped org. Emails are
+resolved to ecosystem userIds **read-only** against the shared `redauth`
+directory — redBook never creates ecosystem identities, because minting a real
+fleet-wide user as a side effect of seeding placeholder data is not its call.
+
+An email with no identity yet becomes a **pending member** (one row in
+`org_pending_members`) and is converted into real membership the first time
+that person signs in. That is how the Josh placeholder stays easy to update:
+change the env var, or edit the single pending row.
 
 ## Data model
 
@@ -54,8 +78,9 @@ or denormalized rollups.
 | GET | `/clients/[clientId]` | session |
 | GET | `/healthz`, `/ready` | none |
 | GET | `/api/config` | none (non-secret only) |
+| GET | `/api/orgs` | session |
 | GET | `/api/me` | session |
-| GET, POST | `/api/clients` | session |
+| GET, POST | `/api/clients` | session + org |
 | GET, PATCH, DELETE | `/api/clients/[clientId]` | session |
 | GET, POST | `/api/clients/[clientId]/{contacts,notes,interactions}` | session |
 | PATCH, DELETE | `/api/{contacts,notes,interactions}/[id]` | session |
@@ -70,12 +95,18 @@ reaches an email sent from a trusted sender identity. It lives outside
 
 ## Seed data
 
-A user whose book is empty gets one starter client — FinThrive, with contacts,
-notes, and interactions — so the app opens with something real-looking. The
-company is real; the people, numbers, and conversations attached to it are
-illustrative placeholders using `example.com` addresses. Seeding runs only
-when the user has zero clients, so deleting a seeded record does not bring it
-back. Set `REDBOOK_AUTOSEED=false` to disable.
+**FinThrive is the org** — Josh's employer, a real US healthcare revenue-cycle
+management SaaS company. It is not a client.
+
+An org whose book is empty gets three starter clients, which are the kind of
+accounts a FinThrive rep would actually carry: healthcare **providers** buying
+revenue-cycle software (an integrated delivery network, a physician group, and
+a community hospital in an RFP). Each has contacts, a pinned note, and logged
+interactions — two with full transcripts. All of it is invented, with
+`example.com` contact details.
+
+Seeding runs only when the org has zero clients, so deleting a seeded record
+does not bring it back. Set `REDBOOK_AUTOSEED=false` to disable.
 
 ## Development
 

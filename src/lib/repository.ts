@@ -3,7 +3,7 @@ import "server-only";
 import { ObjectId, type Collection, type Document, type Filter } from "mongodb";
 
 import { connectMongo } from "@/lib/mongo";
-import { requireOwnerFilter } from "@/lib/authz";
+import { requireOrgFilter, type OrgMembership } from "@/lib/authz";
 import type { Principal } from "@/lib/session";
 import type {
   BaseRecord,
@@ -20,11 +20,14 @@ import type {
 /**
  * Persistence for the CRM.
  *
- * Every function takes a verified `Principal` rather than a bare owner id.
- * That is deliberate: a `Principal` can only be produced by
- * `resolvePrincipal()` from a signed session, so it is impossible to call a
- * repository function on behalf of a user the caller has not proven to be.
- * The owner filter is derived from it and merged into every query and write.
+ * Every function takes a proven `OrgMembership` rather than a bare `orgId`.
+ * That is deliberate: an `OrgMembership` can only be produced by
+ * `resolveMemberships()` from a verified principal, so it is impossible to
+ * call a repository function against a tenant the caller has not been proven
+ * to belong to. The org filter is merged into every query and every write.
+ *
+ * Writes additionally take the `Principal` so `createdBy` records WHO acted,
+ * separately from WHICH tenant owns the row.
  */
 
 export function isValidObjectId(value: string): boolean {
@@ -42,7 +45,7 @@ function nowIso(): string {
 
 interface StoredBase {
   _id: ObjectId;
-  ownerId: string;
+  orgId: string;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -51,16 +54,16 @@ interface StoredBase {
 function toBase(doc: StoredBase) {
   return {
     id: String(doc._id),
-    ownerId: doc.ownerId,
+    orgId: doc.orgId,
     createdBy: doc.createdBy,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
 }
 
-/** Scope a filter to the verified owner. Callers cannot bypass this. */
-function scoped<T extends Document>(principal: Principal, extra: Filter<T> = {}): Filter<T> {
-  return { ...requireOwnerFilter(principal), ...extra } as Filter<T>;
+/** Scope a filter to the proven org. Callers cannot bypass this. */
+function scoped<T extends Document>(membership: OrgMembership, extra: Filter<T> = {}): Filter<T> {
+  return { ...requireOrgFilter(membership), ...extra } as Filter<T>;
 }
 
 // ---------------------------------------------------------------- clients
@@ -82,27 +85,28 @@ function toClient(doc: StoredClient): Client {
   };
 }
 
-export async function listClients(principal: Principal): Promise<Client[]> {
+export async function listClients(membership: OrgMembership): Promise<Client[]> {
   const clients = await collection<StoredClient>("clients");
-  const docs = await clients.find(scoped(principal)).sort({ name: 1 }).limit(500).toArray();
+  const docs = await clients.find(scoped(membership)).sort({ name: 1 }).limit(500).toArray();
   return docs.map(toClient);
 }
 
-export async function getClient(principal: Principal, clientId: string): Promise<Client | null> {
+export async function getClient(membership: OrgMembership, clientId: string): Promise<Client | null> {
   if (!isValidObjectId(clientId)) return null;
   const clients = await collection<StoredClient>("clients");
-  const doc = await clients.findOne(scoped(principal, { _id: new ObjectId(clientId) }));
+  const doc = await clients.findOne(scoped(membership, { _id: new ObjectId(clientId) }));
   return doc ? toClient(doc) : null;
 }
 
 export async function createClient(
+  membership: OrgMembership,
   principal: Principal,
   input: ClientInput,
 ): Promise<Client> {
   const clients = await collection<StoredClient>("clients");
   const timestamp = nowIso();
   const doc = {
-    ownerId: principal.userId,
+    orgId: membership.orgId,
     createdBy: principal.userId,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -121,14 +125,14 @@ export async function createClient(
 }
 
 export async function updateClient(
-  principal: Principal,
+  membership: OrgMembership,
   clientId: string,
   patch: Partial<ClientInput>,
 ): Promise<Client | null> {
   if (!isValidObjectId(clientId)) return null;
   const clients = await collection<StoredClient>("clients");
   const doc = await clients.findOneAndUpdate(
-    scoped(principal, { _id: new ObjectId(clientId) }),
+    scoped(membership, { _id: new ObjectId(clientId) }),
     { $set: { ...patch, updatedAt: nowIso() } },
     { returnDocument: "after" },
   );
@@ -140,14 +144,14 @@ export async function updateClient(
  * (rather than leaving contacts/notes/interactions behind) keeps the org from
  * accumulating orphans that would still match an org-scoped query.
  */
-export async function deleteClient(principal: Principal, clientId: string): Promise<boolean> {
+export async function deleteClient(membership: OrgMembership, clientId: string): Promise<boolean> {
   if (!isValidObjectId(clientId)) return false;
   const clients = await collection<StoredClient>("clients");
-  const result = await clients.deleteOne(scoped(principal, { _id: new ObjectId(clientId) }));
+  const result = await clients.deleteOne(scoped(membership, { _id: new ObjectId(clientId) }));
   if (result.deletedCount === 0) return false;
   for (const name of ["contacts", "notes", "interactions"] as const) {
     const child = await collection(name);
-    await child.deleteMany(scoped(principal, { clientId }) as Filter<Document>);
+    await child.deleteMany(scoped(membership, { clientId }) as Filter<Document>);
   }
   return true;
 }
@@ -169,10 +173,10 @@ function toContact(doc: StoredContact): Contact {
   };
 }
 
-export async function listContacts(principal: Principal, clientId: string): Promise<Contact[]> {
+export async function listContacts(membership: OrgMembership, clientId: string): Promise<Contact[]> {
   const contacts = await collection<StoredContact>("contacts");
   const docs = await contacts
-    .find(scoped(principal, { clientId }))
+    .find(scoped(membership, { clientId }))
     .sort({ isPrimary: -1, name: 1 })
     .limit(500)
     .toArray();
@@ -180,6 +184,7 @@ export async function listContacts(principal: Principal, clientId: string): Prom
 }
 
 export async function createContact(
+  membership: OrgMembership,
   principal: Principal,
   clientId: string,
   input: ContactInput,
@@ -187,7 +192,7 @@ export async function createContact(
   const contacts = await collection<StoredContact>("contacts");
   const timestamp = nowIso();
   const doc = {
-    ownerId: principal.userId,
+    orgId: membership.orgId,
     createdBy: principal.userId,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -204,24 +209,24 @@ export async function createContact(
 }
 
 export async function updateContact(
-  principal: Principal,
+  membership: OrgMembership,
   contactId: string,
   patch: Partial<ContactInput>,
 ): Promise<Contact | null> {
   if (!isValidObjectId(contactId)) return null;
   const contacts = await collection<StoredContact>("contacts");
   const doc = await contacts.findOneAndUpdate(
-    scoped(principal, { _id: new ObjectId(contactId) }),
+    scoped(membership, { _id: new ObjectId(contactId) }),
     { $set: { ...patch, updatedAt: nowIso() } },
     { returnDocument: "after" },
   );
   return doc ? toContact(doc) : null;
 }
 
-export async function deleteContact(principal: Principal, contactId: string): Promise<boolean> {
+export async function deleteContact(membership: OrgMembership, contactId: string): Promise<boolean> {
   if (!isValidObjectId(contactId)) return false;
   const contacts = await collection<StoredContact>("contacts");
-  const result = await contacts.deleteOne(scoped(principal, { _id: new ObjectId(contactId) }));
+  const result = await contacts.deleteOne(scoped(membership, { _id: new ObjectId(contactId) }));
   return result.deletedCount > 0;
 }
 
@@ -238,10 +243,10 @@ function toNote(doc: StoredNote): Note {
   };
 }
 
-export async function listNotes(principal: Principal, clientId: string): Promise<Note[]> {
+export async function listNotes(membership: OrgMembership, clientId: string): Promise<Note[]> {
   const notes = await collection<StoredNote>("notes");
   const docs = await notes
-    .find(scoped(principal, { clientId }))
+    .find(scoped(membership, { clientId }))
     .sort({ pinned: -1, createdAt: -1 })
     .limit(500)
     .toArray();
@@ -249,6 +254,7 @@ export async function listNotes(principal: Principal, clientId: string): Promise
 }
 
 export async function createNote(
+  membership: OrgMembership,
   principal: Principal,
   clientId: string,
   input: NoteInput,
@@ -256,7 +262,7 @@ export async function createNote(
   const notes = await collection<StoredNote>("notes");
   const timestamp = nowIso();
   const doc = {
-    ownerId: principal.userId,
+    orgId: membership.orgId,
     createdBy: principal.userId,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -269,24 +275,24 @@ export async function createNote(
 }
 
 export async function updateNote(
-  principal: Principal,
+  membership: OrgMembership,
   noteId: string,
   patch: Partial<NoteInput>,
 ): Promise<Note | null> {
   if (!isValidObjectId(noteId)) return null;
   const notes = await collection<StoredNote>("notes");
   const doc = await notes.findOneAndUpdate(
-    scoped(principal, { _id: new ObjectId(noteId) }),
+    scoped(membership, { _id: new ObjectId(noteId) }),
     { $set: { ...patch, updatedAt: nowIso() } },
     { returnDocument: "after" },
   );
   return doc ? toNote(doc) : null;
 }
 
-export async function deleteNote(principal: Principal, noteId: string): Promise<boolean> {
+export async function deleteNote(membership: OrgMembership, noteId: string): Promise<boolean> {
   if (!isValidObjectId(noteId)) return false;
   const notes = await collection<StoredNote>("notes");
-  const result = await notes.deleteOne(scoped(principal, { _id: new ObjectId(noteId) }));
+  const result = await notes.deleteOne(scoped(membership, { _id: new ObjectId(noteId) }));
   return result.deletedCount > 0;
 }
 
@@ -309,12 +315,12 @@ function toInteraction(doc: StoredInteraction): Interaction {
 }
 
 export async function listInteractions(
-  principal: Principal,
+  membership: OrgMembership,
   clientId: string,
 ): Promise<Interaction[]> {
   const interactions = await collection<StoredInteraction>("interactions");
   const docs = await interactions
-    .find(scoped(principal, { clientId }))
+    .find(scoped(membership, { clientId }))
     .sort({ occurredAt: -1 })
     .limit(500)
     .toArray();
@@ -322,6 +328,7 @@ export async function listInteractions(
 }
 
 export async function createInteraction(
+  membership: OrgMembership,
   principal: Principal,
   clientId: string,
   input: InteractionInput,
@@ -329,7 +336,7 @@ export async function createInteraction(
   const interactions = await collection<StoredInteraction>("interactions");
   const timestamp = nowIso();
   const doc = {
-    ownerId: principal.userId,
+    orgId: membership.orgId,
     createdBy: principal.userId,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -347,14 +354,14 @@ export async function createInteraction(
 }
 
 export async function updateInteraction(
-  principal: Principal,
+  membership: OrgMembership,
   interactionId: string,
   patch: Partial<InteractionInput>,
 ): Promise<Interaction | null> {
   if (!isValidObjectId(interactionId)) return null;
   const interactions = await collection<StoredInteraction>("interactions");
   const doc = await interactions.findOneAndUpdate(
-    scoped(principal, { _id: new ObjectId(interactionId) }),
+    scoped(membership, { _id: new ObjectId(interactionId) }),
     { $set: { ...patch, updatedAt: nowIso() } },
     { returnDocument: "after" },
   );
@@ -362,12 +369,12 @@ export async function updateInteraction(
 }
 
 export async function deleteInteraction(
-  principal: Principal,
+  membership: OrgMembership,
   interactionId: string,
 ): Promise<boolean> {
   if (!isValidObjectId(interactionId)) return false;
   const interactions = await collection<StoredInteraction>("interactions");
-  const result = await interactions.deleteOne(scoped(principal, { _id: new ObjectId(interactionId) }));
+  const result = await interactions.deleteOne(scoped(membership, { _id: new ObjectId(interactionId) }));
   return result.deletedCount > 0;
 }
 
@@ -385,13 +392,13 @@ export interface ClientSummary {
  * Roll-ups for the client list, computed in one aggregation per collection
  * rather than N queries per client.
  */
-export async function summarizeClients(principal: Principal): Promise<Map<string, ClientSummary>> {
+export async function summarizeClients(membership: OrgMembership): Promise<Map<string, ClientSummary>> {
   const [contacts, notes, interactions] = await Promise.all([
     collection("contacts"),
     collection("notes"),
     collection("interactions"),
   ]);
-  const filter = scoped(principal) as Filter<Document>;
+  const filter = scoped(membership) as Filter<Document>;
 
   const [contactCounts, noteCounts, interactionStats] = await Promise.all([
     contacts.aggregate([{ $match: filter }, { $group: { _id: "$clientId", n: { $sum: 1 } } }]).toArray(),
@@ -424,7 +431,7 @@ export async function summarizeClients(principal: Principal): Promise<Map<string
   return summaries;
 }
 
-export async function countClients(principal: Principal): Promise<number> {
+export async function countClients(membership: OrgMembership): Promise<number> {
   const clients = await collection("clients");
-  return clients.countDocuments(scoped(principal) as Filter<Document>);
+  return clients.countDocuments(scoped(membership) as Filter<Document>);
 }

@@ -1,4 +1,4 @@
-import { errorResponse, json, readJsonBody, withPrincipal } from "@/lib/api";
+import { errorResponse, json, readJsonBody, withOrg } from "@/lib/api";
 import { validateClient, type ClientInput } from "@/lib/crm";
 import { createClient, listClients, summarizeClients } from "@/lib/repository";
 
@@ -6,10 +6,10 @@ export const dynamic = "force-dynamic";
 
 /** The caller's whole book, with per-client roll-ups for the list view. */
 export async function GET(request: Request): Promise<Response> {
-  return withPrincipal(request, async (principal) => {
+  return withOrg(request, async ({ membership }) => {
     const [clients, summaries] = await Promise.all([
-      listClients(principal),
-      summarizeClients(principal),
+      listClients(membership),
+      summarizeClients(membership),
     ]);
     return json({
       clients: clients.map((client) => ({
@@ -26,12 +26,12 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
-  return withPrincipal(request, async (principal) => {
+  return withOrg(request, async ({ membership, principal }) => {
     const body = await readJsonBody(request);
     if (!body.ok) return errorResponse(400, body.error);
     const validated = validateClient(body.value);
     if (!validated.ok) return errorResponse(400, validated.error);
-    const client = await createClient(principal, validated.value as ClientInput);
+    const client = await createClient(membership, principal, validated.value as ClientInput);
     return json({ client }, 201);
   });
 }

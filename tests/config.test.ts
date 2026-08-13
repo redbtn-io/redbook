@@ -68,6 +68,32 @@ describe("loadRuntimeConfig", () => {
   });
 });
 
+describe("org membership settings", () => {
+  it("defaults to the FinThrive org with George and a Josh placeholder", () => {
+    const config = loadRuntimeConfig({});
+    expect(config.defaultOrgName).toBe("FinThrive");
+    expect(config.defaultOrgSlug).toBe("finthrive");
+    expect(config.orgMemberEmails).toEqual(["george8794@gmail.com", "josh@finthrive.example"]);
+  });
+
+  it("parses, lowercases, and de-duplicates a configured member list", () => {
+    // Swapping in Josh's real address must be a one-line env change.
+    const config = loadRuntimeConfig({
+      REDBOOK_ORG_MEMBER_EMAILS: " George8794@Gmail.com , josh@finthrive.com,josh@finthrive.com ,junk ",
+    });
+    expect(config.orgMemberEmails).toEqual(["george8794@gmail.com", "josh@finthrive.com"]);
+  });
+
+  it("accepts an empty member list without inventing one", () => {
+    expect(loadRuntimeConfig({ REDBOOK_ORG_MEMBER_EMAILS: "" }).orgMemberEmails).toEqual([]);
+  });
+
+  it("defaults the redauth directory to the app's Mongo host", () => {
+    const config = loadRuntimeConfig({ MONGODB_URI: "mongodb://127.0.0.1:27017/redbook" });
+    expect(config.authMongoDbName).toBe("redauth");
+  });
+});
+
 describe("signInUrl", () => {
   const config = loadRuntimeConfig({
     PUBLIC_URL: "https://book.redbtn.io",
