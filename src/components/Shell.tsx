@@ -47,12 +47,22 @@ export function Shell({
           ) : null}
           <div className="ml-auto flex shrink-0 items-center gap-3">
             <span className="hidden text-sm text-text-muted sm:inline">{email}</span>
-            <Link
-              href="/signout"
-              className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
-            >
-              Sign out
-            </Link>
+            {/*
+              A form, not a `<Link>`. Sign-out mutates, so it must be a POST:
+              Next.js prefetches in-viewport links, and when this was a link to
+              a GET route the prefetch silently cleared the shared `.redbtn.io`
+              session on every page render — signing the user out of redBook
+              and every other redApp just for loading a page. Forms are never
+              prefetched, and this one needs no JavaScript to work.
+            */}
+            <form method="post" action="/signout">
+              <button
+                type="submit"
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+              >
+                Sign out
+              </button>
+            </form>
           </div>
         </div>
       </header>
