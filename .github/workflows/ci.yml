@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [beta, main]
+
+jobs:
+  build:
+    name: Verify, test, build
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # The @redbtn scope lives on a private registry. The token is written to
+      # a temp userconfig for the duration of the job and removed afterwards,
+      # so it never reaches the workspace or a build artifact.
+      - name: Authenticate to @redbtn registry
+        env:
+          NPMRC: ${{ secrets.NPMRC }}
+          NPM_CONFIG_USERCONFIG: ${{ runner.temp }}/redbtn-npmrc
+        run: |
+          set -eu
+          test -n "$NPMRC" || { echo 'NPMRC Actions secret is required.' >&2; exit 1; }
+          umask 077
+          printf '%s\n' "$NPMRC" > "$NPM_CONFIG_USERCONFIG"
+          grep -Eq '^@redbtn:registry=https://registry\.redbtn\.io/?$' "$NPM_CONFIG_USERCONFIG" || {
+            echo 'NPMRC must map @redbtn to registry.redbtn.io.' >&2
+            exit 1
+          }
+          grep -Eq '^//registry\.redbtn\.io/:(_authToken|username|_password)=' "$NPM_CONFIG_USERCONFIG" || {
+            echo 'NPMRC must contain registry.redbtn.io authentication.' >&2
+            exit 1
+          }
+          echo "NPM_CONFIG_USERCONFIG=$NPM_CONFIG_USERCONFIG" >> "$GITHUB_ENV"
+
+      # A cold registry cache on a self-hosted runner surfaces as npm E401.
+      # One retry is enough; a second consecutive failure is a real auth problem.
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund || npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Verify shared dependency contract
+        run: npm run verify:shared-dependencies
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      - name: Revoke registry credentials
+        if: always()
+        run: rm -f "${NPM_CONFIG_USERCONFIG:-$RUNNER_TEMP/redbtn-npmrc}"
