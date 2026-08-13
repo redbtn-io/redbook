@@ -48,20 +48,21 @@ export async function connectMongo(config: RuntimeConfig = getConfig()): Promise
 let indexesEnsured = false;
 
 /**
- * Every CRM collection is queried owner-first, so every index leads with
- * `ownerId`. That is also the structural half of isolation: a query that
- * forgets the owner filter cannot ride an index and shows up in profiling.
+ * Every CRM collection is queried org-first, so every index leads with
+ * `orgId`. That is also the structural half of tenant isolation: a query that
+ * forgets the org filter cannot ride an index and shows up in profiling.
  */
 async function ensureIndexes(db: Db): Promise<void> {
   if (indexesEnsured) return;
   indexesEnsured = true;
   try {
     await Promise.all([
-      db.collection("clients").createIndex({ ownerId: 1, name: 1 }),
-      db.collection("clients").createIndex({ ownerId: 1, updatedAt: -1 }),
-      db.collection("contacts").createIndex({ ownerId: 1, clientId: 1 }),
-      db.collection("notes").createIndex({ ownerId: 1, clientId: 1, createdAt: -1 }),
-      db.collection("interactions").createIndex({ ownerId: 1, clientId: 1, occurredAt: -1 }),
+      db.collection("clients").createIndex({ orgId: 1, name: 1 }),
+      db.collection("clients").createIndex({ orgId: 1, updatedAt: -1 }),
+      db.collection("contacts").createIndex({ orgId: 1, clientId: 1 }),
+      db.collection("notes").createIndex({ orgId: 1, clientId: 1, createdAt: -1 }),
+      db.collection("interactions").createIndex({ orgId: 1, clientId: 1, occurredAt: -1 }),
+      db.collection("org_pending_members").createIndex({ email: 1 }),
     ]);
   } catch {
     // A read-only or already-indexed database must not stop the app booting.

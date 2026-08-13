@@ -12,10 +12,24 @@ import { validateClient, validateContact, validateInteraction, validateNote } fr
 describe("seed data", () => {
   const records = seedRecords();
 
-  it("seeds FinThrive as a client", () => {
-    expect(records).toHaveLength(1);
-    expect(records[0].client.name).toBe("FinThrive");
-    expect(records[0].client.industry).toMatch(/revenue cycle/i);
+  it("seeds healthcare-provider clients, and never FinThrive itself", () => {
+    // FinThrive is the ORG (Josh's employer), not an account in the book.
+    // Seeding it as a client is the exact mistake this guards against.
+    expect(records.length).toBeGreaterThanOrEqual(2);
+    expect(records.length).toBeLessThanOrEqual(3);
+    for (const record of records) {
+      expect(record.client.name.toLowerCase()).not.toContain("finthrive");
+    }
+    const industries = records.map((r) => (r.client.industry ?? "").toLowerCase());
+    expect(industries.some((i) => /hospital|physician|delivery network/.test(i))).toBe(true);
+  });
+
+  it("gives every client at least one contact and some written context", () => {
+    for (const record of records) {
+      expect(record.contacts.length).toBeGreaterThan(0);
+      expect(record.notes.length).toBeGreaterThan(0);
+      expect(record.interactions.length).toBeGreaterThan(0);
+    }
   });
 
   it("produces clients that pass the same validation the API applies", () => {
@@ -42,18 +56,19 @@ describe("seed data", () => {
     }
   });
 
-  it("gives the account exactly one primary contact", () => {
+  it("gives each account exactly one primary contact", () => {
     for (const record of records) {
       expect(record.contacts.filter((contact) => contact.isPrimary)).toHaveLength(1);
     }
   });
 
   it("carries the freeform material the coaching layer will read", () => {
-    const [record] = records;
-    expect(record.notes.some((note) => note.pinned)).toBe(true);
-    expect(record.interactions.some((entry) => entry.transcript)).toBe(true);
-    expect(record.interactions.every((entry) => entry.summary)).toBe(true);
-    expect(record.interactions.some((entry) => entry.followUps.length > 0)).toBe(true);
+    for (const record of records) {
+      expect(record.notes.some((note) => note.pinned)).toBe(true);
+      expect(record.interactions.every((entry) => entry.summary)).toBe(true);
+      expect(record.interactions.some((entry) => entry.followUps.length > 0)).toBe(true);
+    }
+    expect(records.some((r) => r.interactions.some((e) => e.transcript))).toBe(true);
   });
 
   it("dates interactions in the past and the renewal in the future", () => {

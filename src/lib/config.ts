@@ -20,6 +20,9 @@ export interface RuntimeConfig {
   accountsUrl: string;
   mongoUri: string;
   mongoDbName: string;
+  /** Shared ecosystem redauth DB — read-only, for email -> userId lookups. */
+  authMongoUri: string;
+  authMongoDbName: string;
   secretsDatabase: string;
   /** Optional bootstrap key enabling the redsecrets fallback for JWT_SECRET. */
   secretsEncryptionKey?: string;
@@ -27,7 +30,16 @@ export interface RuntimeConfig {
   /** Enables the X-User-Id + X-Internal-Key service transport when set. */
   internalServiceKey?: string;
   cookieName: "red_session";
-  /** Seed a new user's empty book with starter data on first load. */
+  /** Name/slug of the shared org bootstrapped on first use. */
+  defaultOrgName: string;
+  defaultOrgSlug: string;
+  /**
+   * Humans seated in that org. An email with no ecosystem identity yet becomes
+   * a pending member and is claimed on first sign-in, so the Josh placeholder
+   * is a one-line change here.
+   */
+  orgMemberEmails: string[];
+  /** Seed a new org's empty book with starter data on first load. */
   autoSeed: boolean;
   production: boolean;
 }
@@ -50,6 +62,19 @@ export function normalizeSecret(value: string | undefined): string | undefined {
       ? trimmed.slice(1, -1).trim()
       : trimmed;
   return unquoted || undefined;
+}
+
+/** Comma-separated emails, lowercased and de-duplicated. */
+function readEmailList(value: string | undefined): string[] {
+  if (!value) return [];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((entry) => entry.trim().toLowerCase())
+        .filter((entry) => entry.includes("@")),
+    ),
+  ];
 }
 
 function readPort(value: string | undefined): number {
@@ -79,6 +104,7 @@ export function loadRuntimeConfig(env: EnvBag = process.env): RuntimeConfig {
   const channel = readChannel(env.REDRUN_CHANNEL || env.DEPLOYMENT_CHANNEL);
   const production = env.NODE_ENV === "production" || channel === "production";
   const mongoUri = env.MONGODB_URI || (production ? "" : DEFAULT_MONGO_URI);
+  const authMongoUri = env.AUTH_MONGODB_URI || mongoUri;
 
   return {
     serviceName: "redbook",
@@ -88,11 +114,24 @@ export function loadRuntimeConfig(env: EnvBag = process.env): RuntimeConfig {
     accountsUrl: (env.ACCOUNTS_URL || "https://accounts.redbtn.io").replace(/\/$/, ""),
     mongoUri,
     mongoDbName: env.MONGODB_DB || databaseNameFromUri(mongoUri, "redbook"),
+    authMongoUri,
+    // Only derive the directory DB name from the URI path when a dedicated
+    // AUTH_MONGODB_URI was supplied. Falling back to MONGODB_URI's path would
+    // silently point the user lookup at redBook's OWN database (which has no
+    // users collection), so the default stays the ecosystem `redauth`.
+    authMongoDbName:
+      env.AUTH_MONGODB_DB ||
+      (env.AUTH_MONGODB_URI ? databaseNameFromUri(env.AUTH_MONGODB_URI, "redauth") : "redauth"),
     secretsDatabase: env.REDSECRETS_DATABASE || "redshared",
     secretsEncryptionKey: normalizeSecret(env.REDBOOK_SECRETS_ENCRYPTION_KEY),
     jwtSecret: normalizeSecret(env.JWT_SECRET),
     internalServiceKey: normalizeSecret(env.INTERNAL_SERVICE_KEY),
     cookieName: "red_session",
+    defaultOrgName: env.REDBOOK_DEFAULT_ORG_NAME || "FinThrive",
+    defaultOrgSlug: env.REDBOOK_DEFAULT_ORG_SLUG || "finthrive",
+    orgMemberEmails: readEmailList(
+      env.REDBOOK_ORG_MEMBER_EMAILS ?? "george8794@gmail.com,josh@finthrive.example",
+    ),
     autoSeed: env.REDBOOK_AUTOSEED !== "false",
     production,
   };
