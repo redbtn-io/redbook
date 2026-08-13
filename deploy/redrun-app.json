@@ -1,0 +1,43 @@
+{
+  "name": "redbook",
+  "displayName": "redBook",
+  "description": "The redbtn CRM — clients, contacts, notes, and interactions",
+  "type": "app",
+  "channel": "production",
+  "git": {
+    "repository": "redbtn-io/redbook",
+    "branch": "main",
+    "autoDeploy": true,
+    "useRepoDockerfile": true
+  },
+  "appConfig": {
+    "port": 3000,
+    "customDomains": ["book.redbtn.io"]
+  },
+  "runtime": {
+    "healthPath": "/healthz",
+    "readinessPath": "/ready",
+    "//": "RUNTIME env lives in the RedRun workspace appConfig.env. redsecrets is BUILD-time only in RedRun, so these must be set there, not as build secrets. Values are intentionally not committed.",
+    "environment": [
+      "PUBLIC_URL",
+      "ACCOUNTS_URL",
+      "MONGODB_URI",
+      "MONGODB_DB",
+      "JWT_SECRET",
+      "INTERNAL_SERVICE_KEY",
+      "REDRUN_CHANNEL"
+    ],
+    "optionalEnvironment": [
+      "REDBOOK_SECRETS_ENCRYPTION_KEY",
+      "REDSECRETS_DATABASE",
+      "REDBOOK_AUTOSEED",
+      "EMAIL_USER",
+      "EMAIL_PASS"
+    ]
+  },
+  "notes": [
+    "NODE_ENV must NOT be set to production in appConfig — it breaks npm ci devDependencies during the image build. The Dockerfile sets it in the runner stage only.",
+    "JWT_SECRET is the SHARED ecosystem secret accounts.redbtn.io signs red_session with. redBook only verifies it. A value stored with surrounding quotes fails verification; loadRuntimeConfig strips them defensively.",
+    "Merging to the tracked branch IS the deploy once autoDeploy is on."
+  ]
+}

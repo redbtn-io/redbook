@@ -1,0 +1,39 @@
+{
+  "name": "redbook",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify:shared-dependencies": "node scripts/verify-shared-dependencies.mjs"
+  },
+  "dependencies": {
+    "@redbtn/redauth": "^1.5.1",
+    "@redbtn/redlog": "0.1.0",
+    "@redbtn/redsecrets": "0.1.0",
+    "@redbtn/redstyle": "^0.6.2",
+    "mongodb": "^6.13.1",
+    "next": "16.3.0",
+    "nodemailer": "^7.0.12",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/nodemailer": "^6.4.17",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
+  }
+}
