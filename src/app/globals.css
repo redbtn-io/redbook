@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+/*
+ * The house design system. `tokens.css` carries the canonical palette AND the
+ * `@theme inline` map that turns each token into a Tailwind color, which is
+ * what makes redstyle's own components (`bg-accent`, `text-text-primary`,
+ * `border-border`, …) resolve. `base.css` adds the resets and animations.
+ */
+@import "@redbtn/redstyle/tokens.css";
+@import "@redbtn/redstyle/base.css";
+
+/*
+ * Tailwind v4 auto-detects content but deliberately skips node_modules, so
+ * the utility classes baked into redstyle's compiled components would never
+ * be generated. Without this the shared Button/Card/Badge render unstyled.
+ */
+@source "../../node_modules/@redbtn/redstyle/dist";
+
+/*
+ * redstyle's base.css applies a PWA-style `* { user-select: none }`. That is
+ * right for a touch app and wrong for a CRM, where the entire job is copying
+ * an email address or a phone number out of a record. Re-enable selection for
+ * content, keeping the reset for chrome (nav, buttons, headers).
+ */
+.select-content,
+.select-content * {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}
+
+/* Long transcripts and notes keep their line breaks without a <pre> font. */
+.prose-plain {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
