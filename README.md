@@ -75,11 +75,13 @@ or denormalized rollups.
 | Method | Path | Auth |
 |---|---|---|
 | GET | `/` | session (redirects to accounts) |
+| GET | `/account` | session |
 | GET | `/clients/[clientId]` | session |
 | GET | `/healthz`, `/ready` | none |
 | GET | `/api/config` | none (non-secret only) |
 | GET | `/api/orgs` | session |
 | GET | `/api/me` | session |
+| GET | `/api/redbtn-billing/{subscriptions,invoices}` | session (personal, never org-scoped) |
 | GET, POST | `/api/clients` | session + org |
 | GET, PATCH, DELETE | `/api/clients/[clientId]` | session |
 | GET, POST | `/api/clients/[clientId]/{contacts,notes,interactions}` | session |
@@ -92,6 +94,50 @@ original `functions/` service. It is intentionally unauthenticated, which is
 why every field is validated and escaped in `src/lib/email.ts` before it
 reaches an email sent from a trusted sender identity. It lives outside
 `/api/*` so it can never be mistaken for a session-protected route.
+
+## Your account and redbtn billing
+
+`/account` is the one PERSONAL surface in redBook. Everything else is the org's
+shared book, where every member deliberately sees the same records; this page
+shows only what belongs to the signed-in human, which is why the **redbtn
+Billing** panel lives there and nowhere else. On `/` it would show whichever
+colleague happened to be signed in to every other member of the org.
+
+The panel shows that person's own redbtn subscription, their recent invoices,
+and a link to accounts.redbtn.io to manage the payment method. A `draft`
+invoice is Stripe's word for a charge that has not happened yet, so it renders
+as **Upcoming** with its charge date rather than as the alarming word "draft".
+Most users have no subscription at all, and that is stated plainly rather than
+treated as an error.
+
+The data comes from `billing.redbtn.io`, **server-to-server**. It has to:
+redbilling's CORS allowlist admits `accounts.redbtn.io` and nothing else, so a
+`fetch` from a book.redbtn.io page is blocked before it starts. CORS is a
+browser policy, not an authorization boundary, so `src/lib/billing.ts` calls
+billing from the server instead and forwards **exactly one thing** — the
+caller's own `red_session` cookie. No service key, no internal key, no
+`X-User-Id`. redBook therefore *cannot* ask billing for anyone else's data,
+because it holds no credential that would let it, and per-user isolation is
+inherited from redbilling's own auth rather than re-implemented here. Only
+`red_session` is forwarded, never the raw `Cookie` header, so unrelated
+`.redbtn.io` app cookies are not relayed to another service.
+
+The upstream call is time-boxed at 10s and every failure mode (timeout, 5xx,
+unreadable body, no forwardable cookie) degrades to "billing unavailable" in
+the panel rather than breaking the page. The `/api/redbtn-billing/*` routes
+expose the same data over HTTP and answer **502**, not an empty list, when
+billing cannot be reached: "you have no subscription" and "billing did not
+answer" must not be the same answer, or a paying customer gets told they have
+no plan. `BILLING_URL` overrides the upstream host; it defaults to
+`https://billing.redbtn.io`.
+
+The header's email link to `/account` sets `prefetch={false}` deliberately.
+That page calls a live Stripe-backed service on render, and Next prefetches
+in-viewport links, so leaving prefetch on would fire an upstream request on
+every page view nobody asked for. Same lesson as the sign-out prefetch bug.
+
+Orgs billing **their own** clients is a different product and is deliberately
+not built. The design is frozen in `docs/PLATFORM-BILLING.md`.
 
 ## Seed data
 
