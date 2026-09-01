@@ -18,6 +18,12 @@ export interface RuntimeConfig {
   publicUrl: string;
   /** Central sign-in origin that owns the shared session. */
   accountsUrl: string;
+  /**
+   * The ecosystem billing service. redBook reads the SIGNED-IN USER's own
+   * redbtn subscription and invoices from it server-to-server, forwarding
+   * only that caller's `red_session` cookie — see `src/lib/billing.ts`.
+   */
+  billingUrl: string;
   mongoUri: string;
   mongoDbName: string;
   /** Shared ecosystem redauth DB — read-only, for email -> userId lookups. */
@@ -112,6 +118,7 @@ export function loadRuntimeConfig(env: EnvBag = process.env): RuntimeConfig {
     port: readPort(env.PORT),
     publicUrl: (env.PUBLIC_URL || env.BASE_URL || `http://127.0.0.1:${env.PORT || "3000"}`).replace(/\/$/, ""),
     accountsUrl: (env.ACCOUNTS_URL || "https://accounts.redbtn.io").replace(/\/$/, ""),
+    billingUrl: (env.BILLING_URL || "https://billing.redbtn.io").replace(/\/$/, ""),
     mongoUri,
     mongoDbName: env.MONGODB_DB || databaseNameFromUri(mongoUri, "redbook"),
     authMongoUri,
