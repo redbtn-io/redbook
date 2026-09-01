@@ -65,6 +65,37 @@ export function formatCurrency(value?: number): string {
   });
 }
 
+/**
+ * Money that arrives from Stripe, which counts in minor units.
+ *
+ * Kept separate from `formatCurrency` above: that one renders ARR, a whole-
+ * dollar sales figure, while a billing amount is an exact charge and must show
+ * its cents. Dividing by 100 unconditionally is correct for the currencies
+ * redbtn bills in (usd/eur/gbp); a zero-decimal currency such as JPY would
+ * need a real minor-unit table, which is worth adding the day one appears
+ * rather than guessing at it now.
+ */
+export function formatMoneyFromCents(amountCents?: number | null, currency = "usd"): string {
+  if (typeof amountCents !== "number" || !Number.isFinite(amountCents)) return "—";
+  try {
+    return (amountCents / 100).toLocaleString("en-US", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  } catch {
+    // An unknown currency code throws inside Intl rather than falling back.
+    return `${(amountCents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
+/** "/month", "/year" — the suffix on a recurring price. */
+export function formatInterval(interval?: string | null): string {
+  if (!interval) return "";
+  return `/${interval}`;
+}
+
 /** "in 72 days" / "21 days ago", for renewal and recency cues. */
 export function relativeDays(iso?: string, now: Date = new Date()): string {
   if (!iso) return "—";

@@ -46,7 +46,24 @@ export function Shell({
             </>
           ) : null}
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            <span className="hidden text-sm text-text-muted sm:inline">{email}</span>
+            {/*
+              The signed-in identity doubles as the way into the one personal
+              surface, `/account` — where redbtn billing lives, because it is
+              this human's and not the book's.
+
+              `prefetch={false}` is deliberate. That page calls billing.redbtn.io
+              on render, and Next prefetches in-viewport links, so leaving it on
+              would fire a live Stripe-backed request on every page view that
+              nobody asked for. Same lesson as the sign-out prefetch bug: a
+              prefetcher issues requests no user clicked.
+            */}
+            <Link
+              href="/account"
+              prefetch={false}
+              className="hidden rounded-lg px-2 py-1.5 text-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-text-secondary sm:inline-block"
+            >
+              {email}
+            </Link>
             {/*
               A form, not a `<Link>`. Sign-out mutates, so it must be a POST:
               Next.js prefetches in-viewport links, and when this was a link to

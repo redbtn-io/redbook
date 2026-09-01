@@ -29,6 +29,7 @@
       "REDRUN_CHANNEL"
     ],
     "optionalEnvironment": [
+      "BILLING_URL",
       "REDBOOK_SECRETS_ENCRYPTION_KEY",
       "REDSECRETS_DATABASE",
       "REDBOOK_AUTOSEED",
@@ -43,6 +44,7 @@
   "notes": [
     "NODE_ENV must NOT be set to production in appConfig — it breaks npm ci devDependencies during the image build. The Dockerfile sets it in the runner stage only.",
     "JWT_SECRET is the SHARED ecosystem secret accounts.redbtn.io signs red_session with. redBook only verifies it. A value stored with surrounding quotes fails verification; loadRuntimeConfig strips them defensively.",
-    "Merging to the tracked branch IS the deploy once autoDeploy is on."
+    "Merging to the tracked branch IS the deploy once autoDeploy is on.",
+    "BILLING_URL is optional and defaults to https://billing.redbtn.io. redBook reads the SIGNED-IN USER's own redbtn subscription and invoices from it server-to-server, forwarding only that caller's red_session cookie — no service key. redbilling's CORS allowlist admits accounts.redbtn.io only, which is why the browser must not call it directly."
   ]
 }
