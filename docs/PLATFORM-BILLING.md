@@ -1,8 +1,27 @@
 # Platform billing: redBook orgs billing their own clients
 
-**Status: designed, frozen, not built.** Nothing in this document exists in
-code. It is here so the decision does not have to be made again from scratch
-the day someone asks for it.
+**Status: in progress as part of the redOffice plan (2026-09-05).** The design
+below was frozen when it was written and is now unfrozen: the platform planning
+round of 2026-09-05 folded it into a larger back office plan and scheduled the
+Connect work. Nothing has shipped yet, so read every section below as the
+agreed design rather than as a description of running code.
+
+**Plan:** https://claude.ai/code/artifact/f606a8db-e638-4623-a756-39aee3aac287
+
+Two things changed with that plan, and only two:
+
+1. **Org bookkeeping lives in redOffice, not in redBook.** A new multitenant
+   back office app, `office.redbtn.io`, owns each org's books, counterparties,
+   issued paper and compliance state, with REDBTN LLC as org zero. redBook stays
+   the CRM. It does not grow a ledger, a document archive or a tax pack, and
+   redOffice reaches redBook's book of business over HTTP through an explicit
+   org mapping rather than by sharing a database.
+2. **The trigger condition was met by the second clause, not the first.** No org
+   has asked yet; George decided the platform includes tenant billing. See
+   "Trigger condition" below, which still stands as written.
+
+Everything else in this document, in particular every hard boundary, still holds
+exactly as originally written.
 
 ## Summary
 
@@ -14,9 +33,11 @@ created *on the org's connected account* rather than on redbtn's. Stripe carries
 KYC, underwriting and settlement liability for the connected account, which is
 the entire reason to use Connect instead of processing other people's money on
 redbtn's merchant identity. redbtn's revenue is an **application fee per
-transaction** (take rate TBD), which is how every CRM that touches payments
-monetizes. The work lands as **platform mode** inside the existing redbilling
-service, not as a new product.
+transaction** (take rate still undecided, see the open decisions at the end),
+which is how every CRM that touches payments monetizes. The work lands as
+**platform mode** inside the existing redbilling service, not as a new product,
+and the invoicing surface that sits on top of it is redOffice's rather than
+redBook's.
 
 ## The flow
 
@@ -69,6 +90,15 @@ UI only, and only for org-facing money:
 - Payment status on the client, so a rep sees "$12,000 outstanding, 21 days"
   next to the account they are about to call.
 
+**Revised 2026-09-05:** the authoritative invoicing and bookkeeping surface is
+**redOffice**, not redBook. An org's ledger, issued invoices, document archive
+and tax pack live there. What redBook keeps is the CRM-side read: the payment
+status a rep needs while looking at an account. Whether redBook renders an
+invoice form of its own at all, or only links across to redOffice with the
+client already selected, is a UI call to make when the surface is built. Either
+way redBook does not become the book of record for money, and it does not
+duplicate the ledger.
+
 None of this touches the personal **redbtn Billing** panel on `/account`, which
 shows the signed-in user what *they* pay redbtn and is read from redbilling's
 per-caller endpoints. The two never share a surface.
@@ -89,7 +119,11 @@ product feature into a compliance problem.
 - **redFinance stays single-tenant.** Its own scope forbids tenants. Org
   bookkeeping on top of Connect payouts would be a separate product decision,
   not an extension of redFinance, and pretending otherwise is how a personal
-  finance tool acquires an accidental multitenancy surface.
+  finance tool acquires an accidental multitenancy surface. *(2026-09-05: that
+  separate product decision was taken, and the answer is a separate app,
+  redOffice. redFinance is still not being made multitenant. Whether REDBTN
+  LLC's own books move into redOffice as org zero is decision 1, still George's
+  open call, recorded in redfinance `docs/SCOPE.md`.)*
 - **Connect webhooks are separate from platform webhooks.** Same reason as
   above: two event streams with different trust and different meaning.
 
@@ -104,7 +138,38 @@ Until one of those happens the design is frozen and no code gets written. A
 Connect integration nobody is using is not free: it is a live Stripe platform
 relationship, a KYC support surface, and a dispute queue.
 
-## Open questions (answer these before writing code)
+**2026-09-05: the second condition fired.** George decided the platform bills
+tenants, so the design is no longer frozen and the Connect work is scheduled
+inside redbilling. The cost warning above did not stop being true: it is the
+reason the first tenants are known ones and the reason the take rate is a
+separate decision rather than an assumption baked into the build.
+
+## Still open on 2026-09-05
+
+These are the decisions that must be answered before or during the build. They
+are George's, not an implementer's, and nothing below has been settled.
+
+1. **Connect account type: Standard or Express.** The prose above assumes
+   Express. The 2026-09-05 plan recommends **Standard**, on the grounds that it
+   keeps redbtn out of merchant-of-record status and out of the dispute and
+   fraud liability that comes with Express. The recommendation is not the
+   decision. Until George picks, treat the account type as unfixed and do not
+   let either choice leak into a schema. This supersedes open question 4 below,
+   which is kept for its reasoning.
+2. **Take rate.** The plan's recommendation is 0 bps at launch, stored as a
+   per-org `feeBps` so a rate can be set later without a migration, and
+   revisited once two tenants are live. Still a pricing decision, still open.
+   This is the same question as open question 1 below.
+3. **redOffice pricing and entitlement product key.** Whether tenant access is
+   billed as a standalone product, folded into a redSuite bundle, or free for
+   org zero and the first tenant while pricing is settled. Open, and tangled
+   with the Become monetization epic's grandfathering and pricing decisions.
+4. **Who in an org may connect payments and issue invoices.** Unchanged and
+   still open, but it now lands against redOffice's permission model (`money:*`
+   verbs in the shared org directory) rather than redBook's flat "every member
+   is equal" org model. Same question, different owner. See open question 5.
+
+## Open questions (the original list, kept for its reasoning)
 
 1. **Fee percentage.** What is the take rate, and is it flat or per-plan? This
    is a pricing decision, not an engineering one, and it determines whether the
