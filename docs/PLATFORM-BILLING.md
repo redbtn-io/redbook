@@ -1,10 +1,28 @@
 # Platform billing: redBook orgs billing their own clients
 
-**Status: in progress as part of the redOffice plan (2026-09-05).** The design
-below was frozen when it was written and is now unfrozen: the platform planning
-round of 2026-09-05 folded it into a larger back office plan and scheduled the
-Connect work. Nothing has shipped yet, so read every section below as the
-agreed design rather than as a description of running code.
+**Status: the Connect core is built and merged into redbilling, and is waiting
+on one dashboard step (2026-09-05).** The design below was frozen when it was
+written and is now unfrozen: the platform planning round of 2026-09-05 folded it
+into a larger back office plan and scheduled the Connect work.
+
+What exists in redbilling as of Phase 2A-i: onboarding routes that create a
+Standard account and mint an Account Link, a Connect webhook on its own signing
+secret that maps `event.account` to an organization and quarantines anything it
+cannot map, capability refresh, org-level platform billing routes, an audit row
+before every money action, and a durable signed feed of money events for
+whatever books them (`redbilling/docs/BILLING-EVENTS.md`). Permissions come from
+the shared directory, read-only.
+
+What does NOT exist yet: **Connect is not enabled on the redbtn Stripe
+account.** Stripe answers "you can only create new accounts if you've signed up
+for Connect", so no connected account has been created and nothing has run
+against Stripe's Connect API. The four dashboard steps are in
+`redbilling/docs/CONNECT.md`, and onboarding stays switched off
+(`CONNECT_ENABLED=false`) until they are done. Invoicing on the connected
+account with an application fee lands in 2A-ii.
+
+Read the sections below as the agreed design; where they describe running code,
+check `redbilling/docs/CONNECT.md` for what is actually wired.
 
 **Plan:** https://claude.ai/code/artifact/f606a8db-e638-4623-a756-39aee3aac287
 
