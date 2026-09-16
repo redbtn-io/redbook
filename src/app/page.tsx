@@ -1,19 +1,38 @@
 import { Shell } from "@/components/Shell";
+import { Landing } from "@/components/Landing";
 import { ClientsView, type ClientWithStats } from "@/components/ClientsView";
-import { requirePrincipal } from "@/lib/server-session";
+import { getPrincipal } from "@/lib/server-session";
+import { getConfig, signInUrl } from "@/lib/config";
+import { safeNextPath } from "@/lib/next-path";
 import { resolveActiveOrg } from "@/lib/redorg";
 import { ensureSeeded } from "@/lib/seed";
 import { listClients, summarizeClients } from "@/lib/repository";
 
 /**
- * The org's book. Gated server-side: an unauthenticated visitor is redirected
- * to accounts.redbtn.io before any data is fetched, so nothing renders and no
- * query runs for a caller without a verified session.
+ * Root is the one public page: a visitor with no session gets a short landing
+ * and signs in at accounts.redbtn.io; a member gets the org's book, exactly as
+ * before.
+ *
+ * Still gated server-side, and still gated FIRST — no org is resolved, nothing
+ * is seeded and no query runs for a caller without a verified session. Every
+ * other page keeps bouncing straight to sign-in via `requirePrincipal`, so a
+ * deep link is never lost.
  */
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const principal = await requirePrincipal("/");
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[] }>;
+}) {
+  const principal = await getPrincipal();
+
+  if (!principal) {
+    const { next } = await searchParams;
+    const requested = typeof next === "string" ? next : null;
+    return <Landing signInHref={signInUrl(getConfig(), safeNextPath(requested) ?? "/")} />;
+  }
+
   const resolved = await resolveActiveOrg(principal);
   if (!resolved) {
     return (
