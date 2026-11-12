@@ -1,23 +1,30 @@
 import Link from "next/link";
 
+import { OrgSwitcher, type OrgOption } from "@/components/OrgSwitcher";
+
 /**
  * App chrome: brand, which book you are looking at, the signed-in identity,
  * and a sign-out link.
  *
  * The org name is shown because the book is shared — a member needs to know
  * whose pipeline is on screen, especially once someone belongs to more than
- * one.
+ * one. With several orgs the name becomes a switcher; with one org it stays
+ * a plain label, so a single-book user never sees switcher chrome.
  */
 export function Shell({
   email,
   orgName,
   orgCount = 1,
+  orgs,
+  activeOrgId,
   children,
   breadcrumb,
 }: {
   email: string;
   orgName?: string;
   orgCount?: number;
+  orgs?: OrgOption[];
+  activeOrgId?: string;
   children: React.ReactNode;
   breadcrumb?: React.ReactNode;
 }) {
@@ -29,7 +36,9 @@ export function Shell({
             <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-accent" />
             redBook
           </Link>
-          {orgName ? (
+          {orgs && orgs.length > 1 && activeOrgId ? (
+            <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
+          ) : orgName ? (
             <span
               className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-text-secondary"
               title={orgCount > 1 ? `${orgCount} books available` : undefined}
@@ -46,6 +55,14 @@ export function Shell({
             </>
           ) : null}
           <div className="ml-auto flex shrink-0 items-center gap-3">
+            {orgName ? (
+              <Link
+                href="/members"
+                className="rounded-lg px-2 py-1.5 text-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-text-secondary"
+              >
+                Members
+              </Link>
+            ) : null}
             {/*
               The signed-in identity doubles as the way into the one personal
               surface, `/account` — where redbtn billing lives, because it is

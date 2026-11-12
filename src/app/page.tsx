@@ -1,10 +1,13 @@
+import { cookies } from "next/headers";
+
 import { Shell } from "@/components/Shell";
 import { Landing } from "@/components/Landing";
 import { ClientsView, type ClientWithStats } from "@/components/ClientsView";
 import { getPrincipal } from "@/lib/server-session";
 import { getConfig, signInUrl } from "@/lib/config";
 import { safeNextPath } from "@/lib/next-path";
-import { resolveActiveOrg } from "@/lib/redorg";
+import { ORG_COOKIE } from "@/lib/org-cookie";
+import { isBookOrg, resolveActiveOrg } from "@/lib/redorg";
 import { ensureSeeded } from "@/lib/seed";
 import { listClients, summarizeClients } from "@/lib/repository";
 
@@ -23,7 +26,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string | string[] }>;
+  searchParams: Promise<{ next?: string | string[]; org?: string | string[] }>;
 }) {
   const principal = await getPrincipal();
 
@@ -33,7 +36,18 @@ export default async function HomePage({
     return <Landing signInHref={signInUrl(getConfig(), safeNextPath(requested) ?? "/")} />;
   }
 
-  const resolved = await resolveActiveOrg(principal);
+  // Org selection, redSocial pattern: an explicit `org` parameter on the
+  // link wins, then the last-used-org cookie, then the default book.
+  const { org } = await searchParams;
+  const cookieStore = await cookies();
+  const requestedOrg =
+    (typeof org === "string" ? org : null) ?? cookieStore.get(ORG_COOKIE)?.value ?? null;
+  let resolved = await resolveActiveOrg(principal, requestedOrg);
+  if (!resolved && requestedOrg) {
+    // A stale ref (an org the user has since left) must not strand them on
+    // an empty state; fall back to their default book.
+    resolved = await resolveActiveOrg(principal);
+  }
   if (!resolved) {
     return (
       <Shell email={principal.email}>
@@ -43,7 +57,9 @@ export default async function HomePage({
   }
 
   const { membership, memberships } = resolved;
-  await ensureSeeded(membership, principal);
+  if (await isBookOrg(membership.orgId)) {
+    await ensureSeeded(membership, principal);
+  }
 
   const [clients, summaries] = await Promise.all([
     listClients(membership),
@@ -61,7 +77,13 @@ export default async function HomePage({
   }));
 
   return (
-    <Shell email={principal.email} orgName={membership.orgName} orgCount={memberships.length}>
+    <Shell
+      email={principal.email}
+      orgName={membership.orgName}
+      orgCount={memberships.length}
+      orgs={memberships}
+      activeOrgId={membership.orgId}
+    >
       <ClientsView initialClients={withStats} orgName={membership.orgName} />
     </Shell>
   );

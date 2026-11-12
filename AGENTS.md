@@ -21,15 +21,21 @@ GitHub `main` on `redbtn-io/redbook` is the deploy source of truth, full stop.
 ## Shape
 
 - Next.js app, MongoDB database `redbook` (clients, contacts, notes,
-  interactions collections).
-- Tenancy is `@redbtn/redorg` consumed as a library against the same
-  database, `org_` prefixed collections. An org is one shared book of
-  business and is the access boundary for every record.
+  interactions collections, plus `org_pending_members` and `book_orgs`).
+- Tenancy is `@redbtn/redorg` consumed as a library against the SHARED
+  redOrg directory (database `redorg`, `REDORG_MONGODB_URI`), the same
+  directory redSocial reads. Org ids are the directory's ids and are the
+  access boundary for every record; CRM rows in the `redbook` database
+  key on those ids. Orgs redBook manages as books are marked in
+  `book_orgs`; only those get seeded starter data. The `org_` prefixed
+  collections inside the `redbook` database are a frozen snapshot of the
+  pre-integration silo (kept for restore) and are not read or written.
 - Auth is redbtn accounts SSO (the shared `red_session` cookie) via
   `@redbtn/redauth`.
-- Seeded member emails that do not resolve to a directory user yet are
-  parked in `org_pending_members` and convert to real memberships on first
-  sign-in with that email.
+- Member emails that do not resolve to a directory user yet are parked
+  in `org_pending_members` and convert to real memberships on first
+  sign-in with that email. The members surface lives at `/members`, with
+  API routes under `/api/orgs/[orgId]/members`.
 
 ## House rules
 

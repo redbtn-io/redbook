@@ -23,6 +23,7 @@
       "ACCOUNTS_URL",
       "MONGODB_URI",
       "MONGODB_DB",
+      "REDORG_MONGODB_URI",
       "AUTH_MONGODB_URI",
       "JWT_SECRET",
       "INTERNAL_SERVICE_KEY",

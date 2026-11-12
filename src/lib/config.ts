@@ -26,6 +26,13 @@ export interface RuntimeConfig {
   billingUrl: string;
   mongoUri: string;
   mongoDbName: string;
+  /**
+   * The SHARED ecosystem org directory (database `redorg`), the same store
+   * redSocial and redOffice use. Org identity — organizations, members,
+   * roles — lives there as of the Epic 1 integration, not in redBook's own
+   * database. CRM records stay in `mongoUri`; only org identity moved.
+   */
+  redorgMongoUri: string;
   /** Shared ecosystem redauth DB — read-only, for email -> userId lookups. */
   authMongoUri: string;
   authMongoDbName: string;
@@ -121,6 +128,7 @@ export function loadRuntimeConfig(env: EnvBag = process.env): RuntimeConfig {
     billingUrl: (env.BILLING_URL || "https://billing.redbtn.io").replace(/\/$/, ""),
     mongoUri,
     mongoDbName: env.MONGODB_DB || databaseNameFromUri(mongoUri, "redbook"),
+    redorgMongoUri: normalizeSecret(env.REDORG_MONGODB_URI) ?? "",
     authMongoUri,
     // Only derive the directory DB name from the URI path when a dedicated
     // AUTH_MONGODB_URI was supplied. Falling back to MONGODB_URI's path would
@@ -147,6 +155,12 @@ export function loadRuntimeConfig(env: EnvBag = process.env): RuntimeConfig {
 export function validateRuntimeConfig(config: RuntimeConfig): string[] {
   const errors: string[] = [];
   if (!config.mongoUri) errors.push("MONGODB_URI is required");
+  // Production must name the shared directory explicitly. Falling back to
+  // redBook's own database here would silently resurrect the org silo the
+  // Epic 1 integration retired, so this is a hard error, not a default.
+  if (config.production && !config.redorgMongoUri) {
+    errors.push("REDORG_MONGODB_URI is required");
+  }
   if (!config.jwtSecret && !config.secretsEncryptionKey) {
     errors.push("JWT_SECRET (or REDBOOK_SECRETS_ENCRYPTION_KEY for the redsecrets fallback) is required");
   }

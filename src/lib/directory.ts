@@ -1,6 +1,6 @@
 import "server-only";
 
-import { MongoClient, type Collection, type Document } from "mongodb";
+import { MongoClient, ObjectId, type Collection, type Document } from "mongodb";
 
 import { getConfig, type RuntimeConfig } from "@/lib/config";
 import { logWarn } from "@/lib/logging";
@@ -68,6 +68,53 @@ export async function resolveUserIdsByEmail(
   } catch (error) {
     // A directory outage must not stop the app serving an already-seeded org.
     logWarn("redauth directory lookup failed", {
+      error: error instanceof Error ? error.message : "unknown error",
+    });
+  }
+  return resolved;
+}
+
+export interface DirectoryPerson {
+  email: string;
+  name?: string;
+}
+
+/**
+ * Resolve ecosystem userIds back to people, for the members surface. redOrg
+ * stores only userIds; the email and display name live here in redauth.
+ * Unknown ids are simply absent from the returned map, never invented.
+ */
+export async function resolvePeopleByUserId(
+  userIds: readonly string[],
+  config: RuntimeConfig = getConfig(),
+): Promise<Map<string, DirectoryPerson>> {
+  const wanted = [...new Set(userIds.map((id) => id.trim()).filter(Boolean))];
+  const resolved = new Map<string, DirectoryPerson>();
+  if (wanted.length === 0) return resolved;
+
+  try {
+    const users = await usersCollection(config);
+    if (!users) return resolved;
+    // redauth keys users by ObjectId; ask for both shapes so a string-keyed
+    // record (older or service-created) still resolves.
+    const objectIds = wanted
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+    const docs = await users
+      .find(
+        { _id: { $in: [...objectIds, ...wanted] as never[] } },
+        { projection: { _id: 1, email: 1, name: 1 } },
+      )
+      .toArray();
+    for (const doc of docs) {
+      if (typeof doc.email !== "string") continue;
+      resolved.set(String(doc._id), {
+        email: doc.email.toLowerCase(),
+        name: typeof doc.name === "string" && doc.name.trim() ? doc.name : undefined,
+      });
+    }
+  } catch (error) {
+    logWarn("redauth people lookup failed", {
       error: error instanceof Error ? error.message : "unknown error",
     });
   }
