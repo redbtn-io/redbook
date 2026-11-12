@@ -101,9 +101,14 @@ export function ClientsView({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-text-primary">Clients</h1>
+          {/* The org name is the heading, not a prefix in the small print:
+              several books carry identical starter clients and totals, so
+              the name of the book on screen has to be unmistakable at a
+              glance, and it is the directory record's name, the same one
+              the header switcher shows. */}
+          <h1 className="text-2xl font-semibold text-text-primary">{orgName ?? "Clients"}</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            {orgName ? `${orgName} · ` : ""}
+            {orgName ? "Clients · " : ""}
             {clients.length} {clients.length === 1 ? "account" : "accounts"} · {formatCurrency(totalArr)} tracked
           </p>
         </div>

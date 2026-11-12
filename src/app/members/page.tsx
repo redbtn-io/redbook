@@ -1,15 +1,12 @@
-import { cookies } from "next/headers";
-
 import { Shell } from "@/components/Shell";
 import { MembersView } from "@/components/MembersView";
 import { requirePrincipal } from "@/lib/server-session";
-import { ORG_COOKIE } from "@/lib/org-cookie";
+import { resolvePageOrg } from "@/lib/active-org";
 import {
   getOrgPermissions,
   listInvitableRoles,
   listOrgMembers,
   listPendingMembers,
-  resolveActiveOrg,
 } from "@/lib/redorg";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +23,7 @@ export default async function MembersPage({
 }) {
   const principal = await requirePrincipal("/members");
   const { org } = await searchParams;
-  const cookieStore = await cookies();
-  const requestedOrg =
-    (typeof org === "string" ? org : null) ?? cookieStore.get(ORG_COOKIE)?.value ?? null;
-  let resolved = await resolveActiveOrg(principal, requestedOrg);
-  if (!resolved && requestedOrg) resolved = await resolveActiveOrg(principal);
+  const resolved = await resolvePageOrg(principal, org);
   if (!resolved) {
     return (
       <Shell email={principal.email}>

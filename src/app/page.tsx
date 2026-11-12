@@ -1,13 +1,11 @@
-import { cookies } from "next/headers";
-
 import { Shell } from "@/components/Shell";
 import { Landing } from "@/components/Landing";
 import { ClientsView, type ClientWithStats } from "@/components/ClientsView";
 import { getPrincipal } from "@/lib/server-session";
 import { getConfig, signInUrl } from "@/lib/config";
 import { safeNextPath } from "@/lib/next-path";
-import { ORG_COOKIE } from "@/lib/org-cookie";
-import { isBookOrg, resolveActiveOrg } from "@/lib/redorg";
+import { resolvePageOrg } from "@/lib/active-org";
+import { isBookOrg } from "@/lib/redorg";
 import { ensureSeeded } from "@/lib/seed";
 import { listClients, summarizeClients } from "@/lib/repository";
 
@@ -36,18 +34,11 @@ export default async function HomePage({
     return <Landing signInHref={signInUrl(getConfig(), safeNextPath(requested) ?? "/")} />;
   }
 
-  // Org selection, redSocial pattern: an explicit `org` parameter on the
-  // link wins, then the last-used-org cookie, then the default book.
+  // One resolution for the whole page: the switcher in the header and the
+  // book in the body both render from this result, so they cannot disagree
+  // about which org is active on first load.
   const { org } = await searchParams;
-  const cookieStore = await cookies();
-  const requestedOrg =
-    (typeof org === "string" ? org : null) ?? cookieStore.get(ORG_COOKIE)?.value ?? null;
-  let resolved = await resolveActiveOrg(principal, requestedOrg);
-  if (!resolved && requestedOrg) {
-    // A stale ref (an org the user has since left) must not strand them on
-    // an empty state; fall back to their default book.
-    resolved = await resolveActiveOrg(principal);
-  }
+  const resolved = await resolvePageOrg(principal, org);
   if (!resolved) {
     return (
       <Shell email={principal.email}>

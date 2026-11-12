@@ -23,6 +23,12 @@ export function OrgSwitcher({
 }) {
   return (
     <select
+      // Keyed by the resolved org and closed to form restoration, so the
+      // browser can never resurrect a previous choice over the value the
+      // server resolved for this render. What the switcher shows is the
+      // org the page body rendered, on first paint, with no interaction.
+      key={activeOrgId}
+      autoComplete="off"
       aria-label="Switch organization"
       className="shrink-0 rounded-md border border-border bg-bg-primary px-2 py-0.5 text-xs text-text-secondary"
       value={activeOrgId}

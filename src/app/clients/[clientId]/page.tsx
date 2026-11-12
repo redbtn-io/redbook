@@ -1,11 +1,9 @@
-import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { Shell } from "@/components/Shell";
 import { ClientDetail } from "@/components/ClientDetail";
 import { requirePrincipal } from "@/lib/server-session";
-import { ORG_COOKIE } from "@/lib/org-cookie";
-import { resolveActiveOrg } from "@/lib/redorg";
+import { resolvePageOrg } from "@/lib/active-org";
 import { getClient, listContacts, listInteractions, listNotes } from "@/lib/repository";
 
 export const dynamic = "force-dynamic";
@@ -20,11 +18,7 @@ export default async function ClientPage({
   const { clientId } = await params;
   const principal = await requirePrincipal(`/clients/${clientId}`);
   const { org } = await searchParams;
-  const cookieStore = await cookies();
-  const requestedOrg =
-    (typeof org === "string" ? org : null) ?? cookieStore.get(ORG_COOKIE)?.value ?? null;
-  let resolved = await resolveActiveOrg(principal, requestedOrg);
-  if (!resolved && requestedOrg) resolved = await resolveActiveOrg(principal);
+  const resolved = await resolvePageOrg(principal, org);
   if (!resolved) notFound();
 
   const { membership, memberships } = resolved;
