@@ -106,7 +106,9 @@ export function ClientsView({
               the name of the book on screen has to be unmistakable at a
               glance, and it is the directory record's name, the same one
               the header switcher shows. */}
-          <h1 className="text-2xl font-semibold text-text-primary">{orgName ?? "Clients"}</h1>
+          <h1 className="text-2xl font-semibold text-text-primary [overflow-wrap:anywhere]">
+            {orgName ?? "Clients"}
+          </h1>
           <p className="mt-1 text-sm text-text-secondary">
             {orgName ? "Clients · " : ""}
             {clients.length} {clients.length === 1 ? "account" : "accounts"} · {formatCurrency(totalArr)} tracked
@@ -184,14 +186,14 @@ export function ClientsView({
       ) : null}
 
       <div className="flex flex-wrap gap-3">
-        <div className="min-w-52 flex-1">
+        <div className="min-w-0 flex-1 basis-44">
           <Input
             placeholder="Search clients, industries, tags…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        <div className="w-44">
+        <div className="w-full sm:w-44">
           <Select
             value={statusFilter}
             onChange={setStatusFilter}
@@ -215,7 +217,9 @@ export function ClientsView({
             <Link key={client.id} href={`/clients/${client.id}`} className="block">
               <Card className="h-full p-4 transition-colors hover:border-border-hover hover:bg-bg-hover">
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-semibold text-text-primary">{client.name}</h2>
+                  <h2 className="min-w-0 font-semibold text-text-primary [overflow-wrap:anywhere]">
+                    {client.name}
+                  </h2>
                   <Badge variant={STATUS_VARIANTS[client.status]}>{STATUS_LABELS[client.status]}</Badge>
                 </div>
                 {client.industry ? (

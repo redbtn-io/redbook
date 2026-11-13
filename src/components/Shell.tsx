@@ -31,7 +31,17 @@ export function Shell({
   return (
     <div className="min-h-screen bg-bg-primary">
       <header className="sticky top-0 z-40 border-b border-border bg-bg-primary/85 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-3 px-4 sm:px-6">
+        {/*
+          The row wraps on small screens, deliberately. It used to be one
+          non-wrapping row of shrink-0 segments, and the org switcher (a
+          native select sized by its longest option, and org names are
+          email-shaped and long) pushed the row's minimum width past a
+          phone viewport, which widened the WHOLE document: at 390px the
+          page rendered 512px wide and every screen in the app overflowed
+          on both sides. No segment here is shrink-0 anymore except the
+          brand, and the switcher truncates instead of widening.
+        */}
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2 sm:h-14 sm:flex-nowrap sm:px-6 sm:py-0">
           <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold text-text-primary">
             <span aria-hidden className="inline-block h-3 w-3 rounded-full bg-accent" />
             redBook
@@ -40,7 +50,7 @@ export function Shell({
             <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
           ) : orgName ? (
             <span
-              className="shrink-0 rounded-md border border-border px-2 py-0.5 text-xs text-text-secondary"
+              className="min-w-0 max-w-44 truncate rounded-md border border-border px-2 py-1 text-xs text-text-secondary sm:max-w-none"
               title={orgCount > 1 ? `${orgCount} books available` : undefined}
             >
               {orgName}
@@ -54,11 +64,11 @@ export function Shell({
               <div className="min-w-0 truncate text-sm text-text-secondary">{breadcrumb}</div>
             </>
           ) : null}
-          <div className="ml-auto flex shrink-0 items-center gap-3">
+          <div className="ml-auto flex items-center gap-1 sm:gap-3">
             {orgName ? (
               <Link
                 href="/members"
-                className="rounded-lg px-2 py-1.5 text-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-text-secondary"
+                className="flex min-h-11 items-center rounded-lg px-2 text-sm text-text-muted transition-colors hover:bg-bg-hover hover:text-text-secondary sm:min-h-0 sm:py-1.5"
               >
                 Members
               </Link>
@@ -92,7 +102,7 @@ export function Shell({
             <form method="post" action="/signout">
               <button
                 type="submit"
-                className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-bg-hover"
+                className="min-h-11 rounded-lg border border-border px-3 text-sm text-text-secondary transition-colors hover:bg-bg-hover sm:min-h-0 sm:py-1.5"
               >
                 Sign out
               </button>

@@ -30,7 +30,12 @@ export function OrgSwitcher({
       key={activeOrgId}
       autoComplete="off"
       aria-label="Switch organization"
-      className="shrink-0 rounded-md border border-border bg-bg-primary px-2 py-0.5 text-xs text-text-secondary"
+      // min-w-0 and a mobile cap, never shrink-0: a native select sizes to
+      // its longest option, org names are email-shaped and long, and as a
+      // shrink-0 flex item this one control used to set the whole page's
+      // minimum width past a phone viewport. Constrained, it truncates
+      // the shown name instead of widening the document.
+      className="min-h-11 min-w-0 max-w-48 flex-1 rounded-md border border-border bg-bg-primary px-2 text-xs text-text-secondary sm:min-h-0 sm:max-w-72 sm:flex-none sm:py-0.5"
       value={activeOrgId}
       onChange={(event) => {
         const orgId = event.target.value;
