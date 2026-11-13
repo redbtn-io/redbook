@@ -17,8 +17,10 @@ import {
 } from "@redbtn/redstyle";
 
 import {
+  CLIENT_STATUSES,
   INTERACTION_TYPES,
   type Client,
+  type ClientStatus,
   type Contact,
   type Interaction,
   type InteractionType,
@@ -39,6 +41,8 @@ interface Props {
   contacts: Contact[];
   notes: Note[];
   interactions: Interaction[];
+  /** Owner and admin roles only; the DELETE route enforces the same rule. */
+  canDelete: boolean;
 }
 
 async function post(url: string, body: unknown): Promise<{ ok: boolean; error?: string; data?: never }> {
@@ -59,15 +63,36 @@ async function remove(url: string): Promise<boolean> {
   return response.ok;
 }
 
-export function ClientDetail({ client, contacts, notes, interactions }: Props) {
+/** PATCH or DELETE with the API's own error message when it refuses. */
+async function send(
+  url: string,
+  method: "PATCH" | "DELETE",
+  body?: unknown,
+): Promise<{ ok: boolean; error?: string }> {
+  const response = await fetch(url, {
+    method,
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    return { ok: false, error: payload.error ?? "Request failed" };
+  }
+  return { ok: true };
+}
+
+export function ClientDetail({ client, contacts, notes, interactions, canDelete }: Props) {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
 
   return (
     <div className="space-y-6 select-content">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold text-text-primary">{client.name}</h1>
+            <h1 className="text-2xl font-semibold text-text-primary [overflow-wrap:anywhere]">
+              {client.name}
+            </h1>
             <Badge variant={STATUS_VARIANTS[client.status]}>{STATUS_LABELS[client.status]}</Badge>
           </div>
           {client.industry ? <p className="mt-1 text-text-secondary">{client.industry}</p> : null}
@@ -82,7 +107,7 @@ export function ClientDetail({ client, contacts, notes, interactions }: Props) {
             </a>
           ) : null}
         </div>
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+        <dl className="grid w-full grid-cols-2 gap-x-6 gap-y-2 text-sm sm:w-auto sm:grid-cols-3">
           <div>
             <dt className="text-text-muted">ARR</dt>
             <dd className="text-text-primary">{formatCurrency(client.arr)}</dd>
@@ -120,8 +145,24 @@ export function ClientDetail({ client, contacts, notes, interactions }: Props) {
         </div>
       ) : null}
 
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => setEditing((open) => !open)}>
+          {editing ? "Cancel editing" : "Edit client"}
+        </Button>
+      </div>
+
+      {editing ? (
+        <EditClientForm
+          client={client}
+          onDone={() => {
+            setEditing(false);
+            router.refresh();
+          }}
+        />
+      ) : null}
+
       <Tabs defaultValue="interactions">
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="interactions">Interactions ({interactions.length})</TabsTrigger>
           <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
           <TabsTrigger value="notes">Notes ({notes.length})</TabsTrigger>
@@ -137,7 +178,220 @@ export function ClientDetail({ client, contacts, notes, interactions }: Props) {
           <NotesPanel clientId={client.id} notes={notes} onChange={() => router.refresh()} />
         </TabsContent>
       </Tabs>
+
+      {canDelete ? (
+        <DeleteClientZone
+          client={client}
+          counts={{
+            contacts: contacts.length,
+            notes: notes.length,
+            interactions: interactions.length,
+          }}
+        />
+      ) : null}
     </div>
+  );
+}
+
+// ------------------------------------------------------------- edit client
+
+/**
+ * The whole client record in one form, wired to the PATCH route that has
+ * existed since before the UI did. Validation is the API's: the form sends
+ * what the user typed and shows the API's message inline when it refuses
+ * (a negative ARR, a bad date), so the product and the API can never drift
+ * into two definitions of a valid client.
+ */
+function EditClientForm({ client, onDone }: { client: Client; onDone: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: client.name,
+    status: client.status,
+    owner: client.owner ?? "",
+    industry: client.industry ?? "",
+    website: client.website ?? "",
+    arr: client.arr === undefined ? "" : String(client.arr),
+    renewalDate: client.renewalDate ? client.renewalDate.slice(0, 10) : "",
+    tags: client.tags.join(", "),
+    summary: client.summary ?? "",
+  });
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+    const result = await send(`/api/clients/${client.id}`, "PATCH", {
+      name: form.name,
+      status: form.status,
+      // Text fields go as typed, empty strings included: the validator
+      // reads an empty string as "clear this field" in partial mode, while
+      // an absent key would leave the old value in place.
+      owner: form.owner,
+      industry: form.industry,
+      website: form.website,
+      summary: form.summary,
+      arr: form.arr.trim() === "" ? undefined : Number(form.arr),
+      renewalDate: form.renewalDate || undefined,
+      tags: splitLines(form.tags),
+    });
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error ?? "Could not save the client");
+      return;
+    }
+    onDone();
+  }
+
+  return (
+    <Card className="p-4 sm:p-6">
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            label="Name"
+            required
+            value={form.name}
+            onChange={(event) => setForm({ ...form, name: event.target.value })}
+          />
+          <div>
+            <Label htmlFor="edit-status">Status</Label>
+            <Select
+              value={form.status}
+              onChange={(value) => setForm({ ...form, status: value as ClientStatus })}
+              options={CLIENT_STATUSES.map((status) => ({
+                value: status,
+                label: STATUS_LABELS[status],
+              }))}
+            />
+          </div>
+          <Input
+            label="Owner"
+            value={form.owner}
+            onChange={(event) => setForm({ ...form, owner: event.target.value })}
+            placeholder="Who owns this account?"
+          />
+          <Input
+            label="Industry"
+            value={form.industry}
+            onChange={(event) => setForm({ ...form, industry: event.target.value })}
+          />
+          <Input
+            label="Website"
+            value={form.website}
+            onChange={(event) => setForm({ ...form, website: event.target.value })}
+            placeholder="https://example.com"
+          />
+          <Input
+            label="ARR (USD)"
+            type="number"
+            value={form.arr}
+            onChange={(event) => setForm({ ...form, arr: event.target.value })}
+            placeholder="240000"
+          />
+          <Input
+            label="Renewal date"
+            type="date"
+            value={form.renewalDate}
+            onChange={(event) => setForm({ ...form, renewalDate: event.target.value })}
+          />
+          <Input
+            label="Tags (comma separated)"
+            value={form.tags}
+            onChange={(event) => setForm({ ...form, tags: event.target.value })}
+            placeholder="enterprise, rcm"
+          />
+        </div>
+        <Textarea
+          label="Summary"
+          rows={4}
+          value={form.summary}
+          onChange={(event) => setForm({ ...form, summary: event.target.value })}
+          placeholder="What matters about this account?"
+        />
+        {error ? <p className="text-sm text-error">{error}</p> : null}
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={saving || !form.name.trim()}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDone} disabled={saving}>
+            Cancel
+          </Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
+// ----------------------------------------------------------- delete client
+
+function counted(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/**
+ * The removal path the product was missing. Rendered only for owner and
+ * admin roles, and the DELETE route enforces the same rule server-side.
+ * The confirmation names the client and states the real cascade counts,
+ * loaded with the page, so nobody deletes a book of business by accident
+ * or in ignorance of what goes with it.
+ */
+function DeleteClientZone({
+  client,
+  counts,
+}: {
+  client: Client;
+  counts: { contacts: number; notes: number; interactions: number };
+}) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function confirmDelete() {
+    setDeleting(true);
+    setError(null);
+    const result = await send(`/api/clients/${client.id}`, "DELETE");
+    if (!result.ok) {
+      setDeleting(false);
+      setError(result.error ?? "Could not delete the client");
+      return;
+    }
+    router.push("/");
+    router.refresh();
+  }
+
+  return (
+    <Card className="border-error/40 p-4 sm:p-6">
+      <h2 className="text-sm font-medium text-text-primary">Delete this client</h2>
+      <p className="mt-1 text-sm text-text-secondary">
+        Deleting a client removes it and everything under it from the book. This cannot be undone.
+      </p>
+      {confirming ? (
+        <div className="mt-4 space-y-3">
+          <p className="text-sm text-text-primary">
+            Delete {client.name}? This will permanently delete {client.name} and its{" "}
+            {counted(counts.contacts, "contact", "contacts")},{" "}
+            {counted(counts.notes, "note", "notes")}, and{" "}
+            {counted(counts.interactions, "interaction", "interactions")}.
+          </p>
+          {error ? <p className="text-sm text-error">{error}</p> : null}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="destructive" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? "Deleting…" : `Delete ${client.name}`}
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirming(false)} disabled={deleting}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <Button variant="destructive" onClick={() => setConfirming(true)}>
+            Delete client
+          </Button>
+        </div>
+      )}
+    </Card>
   );
 }
 

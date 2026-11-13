@@ -50,6 +50,24 @@ export function requireOrgAccess(
 }
 
 /**
+ * Who may delete a client. Deleting a client cascades to every contact,
+ * note, and interaction under it, so it is held to the standard of member
+ * management rather than ordinary editing: the org owner, or a member whose
+ * directory role carries `org:manage_members`, which is the grant the Owner
+ * and Admin role templates carry. Ordinary members can edit a client all
+ * day; removing one from the book is an owner and admin act (audit story
+ * 2.2.2). The UI hides the action when this is false, and the DELETE route
+ * refuses when it is false, so the rule does not depend on the client
+ * behaving.
+ */
+export function canDeleteClient(
+  membership: OrgMembership,
+  permissions: readonly string[],
+): boolean {
+  return membership.isOwner || permissions.includes("org:manage_members");
+}
+
+/**
  * The Mongo filter every CRM read and write must carry. Taking an
  * `OrgMembership` rather than a bare string is the point: the type can only
  * be obtained by proving membership first.

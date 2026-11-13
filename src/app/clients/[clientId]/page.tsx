@@ -4,6 +4,8 @@ import { Shell } from "@/components/Shell";
 import { ClientDetail } from "@/components/ClientDetail";
 import { requirePrincipal } from "@/lib/server-session";
 import { resolvePageOrg } from "@/lib/active-org";
+import { canDeleteClient } from "@/lib/authz";
+import { getOrgPermissions } from "@/lib/redorg";
 import { getClient, listContacts, listInteractions, listNotes } from "@/lib/repository";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +29,11 @@ export default async function ClientPage({
   // that does not exist, which is the intended behaviour.
   if (!client) notFound();
 
-  const [contacts, notes, interactions] = await Promise.all([
+  const [contacts, notes, interactions, permissions] = await Promise.all([
     listContacts(membership, clientId),
     listNotes(membership, clientId),
     listInteractions(membership, clientId),
+    getOrgPermissions(membership.orgId, principal.userId),
   ]);
 
   return (
@@ -42,7 +45,13 @@ export default async function ClientPage({
       activeOrgId={membership.orgId}
       breadcrumb={client.name}
     >
-      <ClientDetail client={client} contacts={contacts} notes={notes} interactions={interactions} />
+      <ClientDetail
+        client={client}
+        contacts={contacts}
+        notes={notes}
+        interactions={interactions}
+        canDelete={canDeleteClient(membership, permissions)}
+      />
     </Shell>
   );
 }

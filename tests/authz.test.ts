@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canDeleteClient,
   orgFilter,
   ownsResource,
   requireOrgAccess,
@@ -87,5 +88,22 @@ describe("authorship helpers", () => {
       status: 403,
       error: "Forbidden",
     });
+  });
+});
+
+describe("canDeleteClient", () => {
+  it("allows the org owner with no directory permissions resolved", () => {
+    expect(canDeleteClient(otherOrg, [])).toBe(true);
+  });
+
+  it("allows a member whose role carries org:manage_members (the admin grant)", () => {
+    expect(canDeleteClient(finthrive, ["org:invite_members", "org:manage_members"])).toBe(true);
+  });
+
+  it("refuses an ordinary member, even one who can invite", () => {
+    // Client deletion cascades to every child record, so it is held to the
+    // member-management standard, not the editing standard every member has.
+    expect(canDeleteClient(finthrive, [])).toBe(false);
+    expect(canDeleteClient(finthrive, ["org:invite_members"])).toBe(false);
   });
 });
